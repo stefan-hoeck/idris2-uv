@@ -24,6 +24,9 @@ prim__allocFile : PrimIO (Ptr FilePtr)
 %foreign (idris_uv "uv_free_file")
 prim__freeFile : Ptr FilePtr -> PrimIO ()
 
+%foreign (idris_uv "uv_free_file")
+prim__fileOpen : Ptr FilePtr -> PrimIO ()
+
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
