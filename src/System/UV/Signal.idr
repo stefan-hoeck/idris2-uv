@@ -101,8 +101,8 @@ code SIGUSR2 = prim__SIGUSR2
 parameters {auto has : HasIO io}
 
   export %inline
-  initSignal : Loop -> io Signal
-  initSignal (MkLoop ptr) = MkSignal <$> primIO (prim__initSignal ptr)
+  initSignal : Loop => io Signal
+  initSignal @{MkLoop ptr} = MkSignal <$> primIO (prim__initSignal ptr)
 
   export %inline
   startSignal : Signal -> (Signal -> Int -> IO ()) -> SigCode -> io Int

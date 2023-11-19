@@ -41,17 +41,20 @@ prim__stopTimer : Ptr TimerPtr -> PrimIO Int
 
 parameters {auto has : HasIO io}
   export %inline
-  initTimer : Loop -> io Timer
-  initTimer (MkLoop ptr) = MkTimer <$> primIO (prim__initTimer ptr)
+  initTimer : Loop => io Timer
+  initTimer @{MkLoop ptr} = MkTimer <$> primIO (prim__initTimer ptr)
 
   export %inline
   startTimer : Timer -> (Timer -> IO ()) -> (timeout,repeat : Bits64) -> io Int
   startTimer (MkTimer ptr) f t r =
     primIO $ prim__startTimer ptr (\p => toPrim (f $ MkTimer p)) t r
 
-  export %inline
-  onTimer : Timer -> IO () -> (timeout,repeat : Bits64) -> io ()
-  onTimer p f t r = ignore $ startTimer p (const f) t r
+  export
+  repeatedly : Loop => (timeout,repeat : Bits64) -> IO () -> io Timer
+  repeatedly t r run = do
+    ti <- initTimer
+    ignore $ startTimer ti (const run) t r
+    pure ti
 
   export %inline
   stopTimer : Timer -> io Int
@@ -64,3 +67,7 @@ parameters {auto has : HasIO io}
   export %inline
   endTimer : Timer -> io ()
   endTimer ti = ignore (stopTimer ti) >> freeTimer ti
+
+export %inline
+delayed : HasIO io => Loop => Bits64 -> IO () -> io Timer
+delayed n = repeatedly n 0
