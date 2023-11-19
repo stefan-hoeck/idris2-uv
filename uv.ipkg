@@ -12,6 +12,9 @@ modules = System.UV
         , System.UV.Timer
         , System.UV.Util
 
+        , System.UV.File
+        , System.UV.File.Flags
+
 sourcedir = "src"
 
 prebuild = "make -C support"
