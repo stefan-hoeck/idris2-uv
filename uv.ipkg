@@ -1,0 +1,19 @@
+package uv
+version = 0.1.0
+authors = "stefan-hoeck"
+brief   = "Idris2 bindings to libuv"
+
+depends = base >= 0.6.0
+        , elab-util
+
+modules = System.UV
+        , System.UV.Loop
+        , System.UV.Signal
+        , System.UV.Timer
+        , System.UV.Util
+
+sourcedir = "src"
+
+prebuild = "make -C support"
+
+preinstall = "make -C support install"

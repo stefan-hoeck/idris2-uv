@@ -1,0 +1,5 @@
+build/
+*.*~
+lib/
+support/idris2-uv.o
+support/libuv-idris

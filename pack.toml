@@ -1,0 +1,10 @@
+[custom.all.uv]
+type = "local"
+path = "."
+ipkg = "uv.ipkg"
+test = "test/test.ipkg"
+
+[custom.all.uv-test]
+type = "local"
+path = "test"
+ipkg = "test.ipkg"
