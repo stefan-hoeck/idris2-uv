@@ -1,5 +1,7 @@
 module System.UV.Loop
 
+import Control.Monad.Either
+import System.UV.Error
 import System.UV.Util
 
 %default total
@@ -20,17 +22,32 @@ record Loop where
 %foreign (idris_uv "uv_default_loop")
 prim__defaultLoop : PrimIO (Ptr LoopPtr)
 
-%foreign (idris_uv "uv_run")
-prim__loopRun : Ptr LoopPtr -> Bits32 -> PrimIO Int32
+covering %foreign (idris_uv "uv_run")
+prim__loopRun : Ptr LoopPtr -> Bits32 -> PrimIO Int64
 
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
+||| Returns the default loop, corresponding to `uv_default_loop`.
 export %inline
 defaultLoop : HasIO io => io Loop
 defaultLoop = MkLoop <$> primIO prim__defaultLoop
 
-export %inline
-runLoop : HasIO io => Loop -> io Int32
-runLoop (MkLoop ptr) = primIO $ prim__loopRun ptr 0
+||| Starts the given loop.
+|||
+||| For many use-cases, this will literally loop forever or until the
+||| application is terminated via an external event, therefore, this is
+||| a covering action.
+covering export %inline
+runLoop : Loop -> UVIO ()
+runLoop (MkLoop ptr) = primUV $ prim__loopRun ptr 0
+
+||| Sets up the given application by registering it at the default loop
+||| and starting the loop afterwards.
+covering export
+runUV : (Loop => UVIO ()) -> UVIO ()
+runUV act = do
+  loop <- defaultLoop
+  act @{loop}
+  runLoop loop

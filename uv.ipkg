@@ -5,8 +5,10 @@ brief   = "Idris2 bindings to libuv"
 
 depends = base >= 0.6.0
         , elab-util
+        , bytestring
 
 modules = System.UV
+        , System.UV.Error
         , System.UV.Loop
         , System.UV.Signal
         , System.UV.Timer
