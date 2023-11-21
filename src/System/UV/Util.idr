@@ -1,5 +1,7 @@
 module System.UV.Util
 
+import Data.IORef
+
 %default total
 
 public export

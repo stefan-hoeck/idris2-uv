@@ -1,6 +1,8 @@
 module System.UV.Loop
 
 import Control.Monad.Either
+import Data.IORef
+import System
 import System.UV.Error
 import System.UV.Util
 
@@ -14,6 +16,30 @@ record Loop where
   [noHints]
   constructor MkLoop
   loop : Ptr LoopPtr
+
+||| A resource that can be safely released, for instance,
+||| a pointer whose memory we want to free.
+|||
+||| Once a resource has been released via `release`,
+||| it is safe to dispose of it. Internally, the resource
+||| makes sure it can be released only once, so additional
+||| calls to `release` just have no effect.
+export
+record Resource where
+  constructor R
+  ref : IORef (IO ())
+
+unit : IO ()
+unit = pure ()
+
+export
+release : Resource -> IO ()
+release (R ref) = do
+  join (readIORef ref) >> writeIORef ref unit
+
+export %inline
+handle : HasIO io => IO () -> io (Resource)
+handle = map R . newIORef
 
 --------------------------------------------------------------------------------
 -- FFI
@@ -46,8 +72,20 @@ runLoop (MkLoop ptr) = primUV $ prim__loopRun ptr 0
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.
 covering export
-runUV : (Loop => UVIO ()) -> UVIO ()
+runUV : (Loop => UVIO ()) -> IO ()
 runUV act = do
-  loop <- defaultLoop
-  act @{loop}
-  runLoop loop
+  Right () <- runEitherT run' | Left err => die "\{err}"
+  pure ()
+
+  where
+    run' : UVIO ()
+    run' = do
+      loop <- defaultLoop
+      act @{loop}
+      runLoop loop
+
+export
+runUVIO : UVIO () -> IO ()
+runUVIO act = do
+  Right () <- runEitherT act | Left err => putStrLn "\{err}"
+  pure ()

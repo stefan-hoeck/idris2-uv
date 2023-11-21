@@ -5,19 +5,13 @@ import Derive.Prelude
 import System.UV.Error
 import System.UV.Loop
 import System.UV.Util
+import System.FFI
 
 %default total
 %language ElabReflection
 
 export
-data SignalPtr : Type where
-
-||| Allocated pointer to an `uv_signal_t`.
-public export
-record Signal where
-  [noHints]
-  constructor MkSignal
-  signal : Ptr SignalPtr
+data Signal : Type where
 
 ||| Signalcodes we can react on.
 public export
@@ -40,20 +34,17 @@ data SigCode : Type where
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_init_signal")
-prim__initSignal : Ptr LoopPtr -> PrimIO (Ptr SignalPtr)
-
-%foreign (idris_uv "uv_free_signal")
-prim__freeSignal : Ptr SignalPtr -> PrimIO ()
+prim__initSignal : Ptr LoopPtr -> PrimIO (Ptr Signal)
 
 %foreign (idris_uv "uv_signal_start")
 prim__startSignal :
-     Ptr SignalPtr
-  -> (Ptr SignalPtr -> Int64 -> PrimIO ())
+     Ptr Signal
+  -> (Ptr Signal -> Int64 -> PrimIO ())
   -> Int64
   -> PrimIO Int64
 
 %foreign (idris_uv "uv_signal_stop")
-prim__stopSignal : Ptr SignalPtr -> PrimIO Int64
+prim__stopSignal : Ptr Signal -> PrimIO Int64
 
 %foreign (idris_uv "uv_sigabrt")
 prim__SIGABRT : Int64
@@ -103,27 +94,15 @@ code SIGTRAP = prim__SIGTRAP
 code SIGUSR1 = prim__SIGUSR1
 code SIGUSR2 = prim__SIGUSR2
 
-export %inline
-initSignal : Loop => HasIO io => io Signal
-initSignal @{MkLoop ptr} = MkSignal <$> primIO (prim__initSignal ptr)
+freeSignal : Ptr Signal -> IO ()
+freeSignal ptr = do
+  _ <- primIO $ prim__stopSignal ptr
+  free $ prim__forgetPtr ptr
 
-export %inline
-startSignal : Signal -> (Signal -> Int64 -> IO ()) -> SigCode -> UVIO ()
-startSignal (MkSignal ptr) f c =
-  primUV $ prim__startSignal ptr (\p,s => toPrim (f (MkSignal p) s)) (code c)
-
-export %inline
-onSignal : Signal -> IO () -> SigCode -> UVIO ()
-onSignal s f c = startSignal s (\_,_ => f) c
-
-export %inline
-stopSignal : Signal -> UVIO ()
-stopSignal (MkSignal ptr) = primUV $ prim__stopSignal ptr
-
-export %inline
-freeSignal : HasIO io => Signal -> io ()
-freeSignal (MkSignal ptr) = primIO (prim__freeSignal ptr)
-
-export %inline
-endSignal : Signal -> UVIO ()
-endSignal si = stopSignal si >> freeSignal si
+export
+onSignal : Loop => SigCode -> IO () -> UVIO Resource
+onSignal @{MkLoop ptr} c f = do
+  si <- primIO $ prim__initSignal ptr
+  re <- handle (freeSignal si)
+  _  <- primIO $ prim__startSignal si (\p,s => toPrim $ f >> release re) (code c)
+  pure re

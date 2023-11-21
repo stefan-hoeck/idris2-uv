@@ -1,34 +1,57 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <uv.h>
 
-uv_fs_t* uv_alloc_file(){
-  uv_fs_t* fs = malloc(sizeof(uv_fs_t));
-  return fs;
-}
-
-void* uv_free_file(uv_fs_t* fs){
-  free(fs);
-}
-
+// Allocate memory for a timer and initialize it at the
+// event loop
 uv_timer_t* uv_init_timer(uv_loop_t* loop){
   uv_timer_t* timer = malloc(sizeof(uv_timer_t));
   uv_timer_init(loop, timer);
   return timer;
 }
 
-void* uv_free_timer(uv_timer_t* timer){
-  free(timer);
-}
-
+// Allocate memory for a signal handler and initialize it at the
+// event loop
 uv_signal_t* uv_init_signal(uv_loop_t* loop){
   uv_signal_t* signal = malloc(sizeof(uv_signal_t));
   uv_signal_init(loop, signal);
   return signal;
 }
 
-void* uv_free_signal(uv_signal_t* signal){
-  free(signal);
+// Allocate memory for a file handle
+uv_fs_t* uv_alloc_fs(){
+  uv_fs_t* fs = malloc(sizeof(uv_fs_t));
+  return fs;
+}
+
+// Extract the result int from an `uv_fs_t`.
+int uv_fs_result(uv_fs_t* fs){
+  return fs->result;
+}
+
+// Allocate memore for reading a char array of the given
+// length and initialize an `uv_buf_t` with this.
+uv_buf_t* uv_init_buf(unsigned int length){
+  char *dat = NULL;
+  dat = malloc(length * sizeof *dat);
+  uv_buf_t* buf = malloc(sizeof(uv_buf_t));
+  *buf = uv_buf_init(dat,length);
+  return buf;
+}
+
+void* uv_free_buf(uv_buf_t* buf){
+  free(buf->base);
+  free(buf);
+}
+
+void* uv_copy_buf(uv_buf_t* buf, char* dest){
+  memcpy(dest, buf->base, buf->len);
+}
+
+// Read data from a file
+int uv_read_fs(uv_loop_t *loop, uv_fs_t *req, uv_file file, uv_buf_t* buf, int64_t offset, uv_fs_cb cb){
+  return uv_fs_read(loop, req, file, buf, 1, offset, cb);
 }
 
 int uv_sigabrt() {return SIGABRT;}

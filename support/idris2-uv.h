@@ -1,14 +1,21 @@
+// Timers
 uv_timer_t* uv_init_timer(uv_loop_t* loop);
 
-void* uv_free_timer(uv_timer_t* timer);
-
+// Signals
 uv_signal_t* uv_init_signal(uv_loop_t* loop);
 
-void* uv_free_signal(uv_signal_t* signal);
+// Files
+uv_fs_t* uv_alloc_fs()
 
-uv_fs_t* uv_alloc_file()
+uv_buf_t* uv_init_buf(unsigned int length)
 
-void* uv_free_file(uv_fs_t* fs)
+void* uv_free_buf(uv_buf_t* buf)
+
+int uv_read_fs(uv_loop_t* loop, uv_fs_t* req, uv_file file, uv_buf_t* buf, int64_t offset, uv_fs_cb cb)
+
+int uv_fs_result(uv_fs_t* fs)
+
+void* uv_copy_buf(uv_buf_t* buf, char* dest);
 
 int uv_sigabrt();
 int uv_sigfpe();
