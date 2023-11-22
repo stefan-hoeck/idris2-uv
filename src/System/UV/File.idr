@@ -7,25 +7,16 @@ import Data.Buffer
 import System.FFI
 import System.UV.Error
 import System.UV.File.Flags
+import System.UV.Handle
 import System.UV.Loop
+import System.UV.Req
 import System.UV.Util
 
 %default total
 
-||| A `Ptr FSPtr` corresponst to an `un_fs_t` pointer
+||| A `Ptr Buf` corresponst to an `un_buf_t` pointer
 export
-data FSPtr : Type where
-
-||| Data type wrapping a pointer to an `uv_fs_t` struct and a file handle.
-public export
-record UFile where
-  constructor MkUFile
-  fs     : Ptr FSPtr
-  handle : Int64
-
-||| A `Ptr BufPtr` corresponst to an `un_buf_t` pointer
-export
-data BufPtr : Type where
+data Buf : Type where
 
 --------------------------------------------------------------------------------
 -- FFI
@@ -35,179 +26,248 @@ data BufPtr : Type where
          "node:lambda:s=>Buffer.alloc(s)"
 prim__newBuf : Bits32 -> PrimIO Buffer
 
-%foreign (idris_uv "uv_alloc_fs")
-prim__allocFS : PrimIO (Ptr FSPtr)
-
 %foreign (idris_uv "uv_init_buf")
-prim__initBuf : Bits32 -> PrimIO (Ptr BufPtr)
+prim__uv_init_buf : Bits32 -> PrimIO (Ptr Buf)
+
+%foreign (idris_uv "uv_set_buf_len")
+prim__uv_set_buf_len : Ptr Buf -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_free_buf")
-prim__freeBuf : Ptr BufPtr -> PrimIO ()
+prim__uv_free_buf : Ptr Buf -> PrimIO ()
 
-%foreign (idris_uv "uv_fs_result")
-prim__fileResult : Ptr FSPtr -> PrimIO Int64
+%foreign (idris_uv "uv_fs_get_result")
+prim__uv_fs_get_result : Ptr Fs -> PrimIO Int64
 
 %foreign (idris_uv "uv_copy_buf")
-prim__copyBuf : Ptr BufPtr -> Buffer -> PrimIO ()
+prim__uv_copy_to_buf : Ptr Buf -> Buffer -> Bits32 -> PrimIO ()
+
+%foreign (idris_uv "uv_copy_buf")
+prim__uv_copy_from_buf : Buffer -> Ptr Buf -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_fs_req_cleanup")
-prim__uv_fs_req_cleanup : Ptr FSPtr -> PrimIO ()
+prim__uv_fs_req_cleanup : Ptr Fs -> PrimIO ()
 
 %foreign (idris_uv "uv_fs_open")
-prim__fileOpen :
+prim__uv_fs_open :
      Ptr LoopPtr
-  -> Ptr FSPtr
+  -> Ptr Fs
   -> String
   -> (flags,mode : Bits32)
-  -> (cb : Ptr FSPtr -> PrimIO ())
+  -> (cb : Ptr Fs -> PrimIO ())
   -> PrimIO Int64
 
-%foreign (idris_uv "uv_read_fs")
-prim__fileRead :
+%foreign (idris_uv "uv_fs_read")
+prim__uv_fs_read :
      Ptr LoopPtr
-  -> Ptr FSPtr
+  -> Ptr Fs
   -> (file   : Int64)
-  -> (buf    : Ptr BufPtr)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
   -> (offset : Int64)
-  -> (cb : Ptr FSPtr -> PrimIO ())
+  -> (cb     : Ptr Fs -> PrimIO ())
+  -> PrimIO Int64
+
+%foreign (idris_uv "uv_fs_write")
+prim__uv_fs_write :
+     Ptr LoopPtr
+  -> Ptr Fs
+  -> (file   : Int64)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
+  -> (offset : Int64)
+  -> (cb     : Ptr Fs -> PrimIO ())
   -> PrimIO Int64
 
 %foreign (idris_uv "uv_fs_close")
-prim__fileClose :
+prim__uv_fs_close :
      Ptr LoopPtr
-  -> Ptr FSPtr
+  -> Ptr Fs
   -> (file : Int64)
-  -> (cb : Ptr FSPtr -> PrimIO ())
+  -> (cb   : Ptr Fs -> PrimIO ())
   -> PrimIO Int64
-
-%foreign (idris_uv "uv_fs_req_cleanup")
-prim__fsReqCleanup : Ptr FSPtr -> PrimIO ()
 
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
-||| Free the memory allocated for an `uv_fs_t` pointer.
+||| Frees a file reading buffer allocated with `allocBuf`.
 export %inline
-freeBuf : HasIO io => Ptr BufPtr -> io ()
-freeBuf p = primIO $ prim__freeBuf p
+freeBuf : HasIO io => Ptr Buf -> io ()
+freeBuf p = primIO $ prim__uv_free_buf p
 
-fileRes : HasIO io => Ptr FSPtr -> io Int64
-fileRes p = primIO $ prim__fileResult p
+||| Allocate a buffer for file reading. Make sure to release this with
+||| `freeBuf` once it is no longer needed.
+export %inline
+allocBuf : HasIO io => Bits32 -> io (Ptr Buf)
+allocBuf p = primIO $ prim__uv_init_buf p
 
-||| Asynchronously closes a file and releases the file handle.
+export %inline
+setBufLen : HasIO io => Ptr Buf -> Bits32 -> io ()
+setBufLen p len = primIO $ prim__uv_set_buf_len p len
+
+||| Returns the result code received after a file operation.
+export %inline
+fsResult : HasIO io => Ptr Fs -> io Int64
+fsResult p = primIO $ prim__uv_fs_get_result p
+
+||| Synchronously closes a file and releases the file handle.
 |||
 ||| Once the file is closed, the given `IO` action is invoked.
 export %inline
-fileCloseWith : Loop => UFile -> IO () -> IO ()
-fileCloseWith @{MkLoop p} (MkUFile fs h) run =
-  ignore $ primIO $ prim__fileClose p fs h (\_ => toPrim $ free (prim__forgetPtr fs) >> run)
+fsClose : (l : Loop) => Ptr Fs -> Int64 -> (Ptr Fs -> IO ()) -> UVIO ()
+fsClose fs h run = do
+  primUV $ prim__uv_fs_close l.loop fs h (\p => toPrim $ run p)
 
-||| Asynchronously closes a file and releases the file handle without
-||| any further action.
+||| Asynchronously opens a file, invoking the given callback once
+||| the file is ready.
 export %inline
-fileClose : Loop => UFile -> IO ()
-fileClose uf = fileCloseWith uf (pure ())
-
-||| Asynchronously closes a file and releases the file handle without
-||| any further action.
-export
-fileOpen : Loop => String -> Flags -> Mode -> (UFile -> IO ()) -> UVIO ()
-fileOpen @{MkLoop p} path flags mode act = do
-  ptr <- primIO $ prim__allocFS
-  primUV $ prim__fileOpen p ptr path flags.flags mode.mode $
-    \p => toPrim $ do
-      h <- primIO (prim__fileResult p)
-      act (MkUFile p h)
-
-copyData : Ptr BufPtr -> Bits32 -> IO ByteString
-copyData p n = do
-  buf <- primIO $ prim__newBuf n
-  primIO $ prim__copyBuf p buf
-  pure (unsafeByteString (cast n) buf)
-
-cleanupFP : Ptr FSPtr -> IO ()
-cleanupFP fp = primIO $ prim__uv_fs_req_cleanup fp
-
-export
-fileRead :
+fsOpen :
      {auto l : Loop}
-  -> UFile
-  -> (numBytes : Bits32)
-  -> (position : Int64)
-  -> (Either UVError ByteString -> IO ())
-  -> UVIO ()
-fileRead @{MkLoop l} (MkUFile f h) numBytes pos act = MkEitherT $ do
-  buf <- primIO $ prim__initBuf numBytes
-  res <- primIO $ prim__fileRead l f h buf pos $ \fp => toPrim $ do 
-    n <- fileRes fp 
-    if n == 0
-       then act (Right empty)
-       else
-         if n < 0
-            then act (Left $ fromCode n)
-            else copyData buf (cast n) >>= act . Right
-    primIO $ prim__uv_fs_req_cleanup fp
-    freeBuf buf
-  when (res < 0) (freeBuf buf)
-  pure $ uvRes res
-
-export
-read :
-     {auto l : Loop}
+  -> Ptr Fs
   -> String
-  -> (numBytes : Bits32)
-  -> (Either UVError ByteString -> IO ())
+  -> Flags
+  -> Mode
+  -> (Ptr Fs -> IO ())
   -> UVIO ()
-read path nb act = do
-  fileOpen path RDONLY neutral $ \fp =>
-    runUVIO $ fileRead fp nb 0 (\res => fileClose fp >> act res)
+fsOpen ptr path fs m act = do
+  primUV $ prim__uv_fs_open l.loop ptr path fs.flags m.mode $
+    \p => toPrim (act p)
 
---------------------------------------------------------------------------------
--- Streaming
---------------------------------------------------------------------------------
-
-public export
-data StreamRes : (a : Type) -> Type where
-  Err   : UVError -> StreamRes a
-  Empty : StreamRes a
-  Val   : a -> StreamRes a
-
-public export
-data Continue = Cont | Stop
-
-public export
-0 StreamResp : (s : StreamRes a) -> Type
-StreamResp (Err x) = ()
-StreamResp Empty   = ()
-StreamResp (Val x) = Continue
-
-export covering
-stream :
+||| Reads data from a file into the given buffer and invokes
+||| the callback function once the data is ready.
+export
+fsRead :
      {auto l : Loop}
-  -> String
-  -> (numBytes : Bits32)
-  -> ((s : StreamRes ByteString) -> IO (StreamResp s))
+  -> Ptr Fs
+  -> (file   : Int64)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
+  -> (offset : Int64)
+  -> (cb     : Ptr Fs -> IO ())
   -> UVIO ()
-stream path nb act = do
-  buf <- primIO $ prim__initBuf nb
-  fileOpen path RDONLY neutral (go buf)
+fsRead f h bufs nbufs offset act =
+  primUV $ prim__uv_fs_read l.loop f h bufs nbufs offset $
+    \fp => toPrim (act fp)
 
-  where
-    covering
-    go : Ptr BufPtr -> UFile -> IO ()
-    go buf fi@(MkUFile f h) = do
-      res <- primIO $ prim__fileRead l.loop f h buf (-1) $ \fp => toPrim $ do
-        n <- fileRes fp 
-        cleanupFP fp
-        if n == 0
-           then fileClose fi >> freeBuf buf >> act Empty
-           else
-             if n < 0
-                then fileClose fi >> freeBuf buf >> act (Err $ fromCode n)
-                else do
-                  bs <- copyData buf (cast n)
-                  Cont <- act (Val bs) | Stop => fileClose fi >> freeBuf buf
-                  go buf fi
-      when (res < 0) (fileClose fi >> freeBuf buf)
-      pure ()
+||| Writes data from the given buffer to a file and invokes
+||| the callback function once the data is ready.
+export
+fsWrite :
+     {auto l : Loop}
+  -> Ptr Fs
+  -> (file   : Int64)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
+  -> (offset : Int64)
+  -> (cb     : Ptr Fs -> IO ())
+  -> UVIO ()
+fsWrite f h bufs nbufs offset act =
+  primUV $ prim__uv_fs_write l.loop f h bufs nbufs offset $
+    \fp => toPrim (act fp)
+
+||| Copies data from a byte array handled by libuv to an
+||| Idris buffer.
+|||
+||| This comes without sanity checks. Callers must make sure that
+||| both byte arrays hold at least the given number of bytes.
+export %inline
+copyToBuffer : HasIO io => Ptr Buf -> Buffer -> Bits32 -> io ()
+copyToBuffer p buf bytes = primIO $ prim__uv_copy_to_buf p buf bytes
+
+||| Copies data from a byte array handled by libuv to an
+||| Idris buffer.
+|||
+||| This comes without sanity checks. Callers must make sure that
+||| both byte arrays hold at least the given number of bytes.
+export %inline
+copyFromBuffer : HasIO io => Buffer -> Ptr Buf -> Bits32 -> io ()
+copyFromBuffer buf p bytes = primIO $ prim__uv_copy_from_buf buf p bytes
+
+export %inline
+fsCleanup : HasIO io => Ptr Fs -> io ()
+fsCleanup fp = primIO $ prim__uv_fs_req_cleanup fp
+
+-- export
+-- fileRead :
+--      {auto l : Loop}
+--   -> UFile
+--   -> (numBytes : Bits32)
+--   -> (position : Int64)
+--   -> (Either UVError ByteString -> IO ())
+--   -> UVIO ()
+-- fileRead @{MkLoop l} (MkUFile f h) numBytes pos act = MkEitherT $ do
+--   buf <- primIO $ prim__initBuf numBytes
+--   res <- primIO $ prim__uv_fs_read l f h buf pos $ \fp => toPrim $ do 
+--     n <- fileRes fp 
+--     if n == 0
+--        then act (Right empty)
+--        else
+--          if n < 0
+--             then act (Left $ fromCode n)
+--             else copyData buf (cast n) >>= act . Right
+--     primIO $ prim__uv_fs_req_cleanup fp
+--     freeBuf buf
+--   when (res < 0) (freeBuf buf)
+--   pure $ uvRes res
+-- 
+-- export
+-- read :
+--      {auto l : Loop}
+--   -> String
+--   -> (numBytes : Bits32)
+--   -> (Either UVError ByteString -> IO ())
+--   -> UVIO ()
+-- read path nb act = do
+--   fileOpen path RDONLY neutral $ \fp =>
+--     runUVIO $ fileRead fp nb 0 (\res => fileClose fp >> act res)
+-- 
+-- --------------------------------------------------------------------------------
+-- -- Streaming
+-- --------------------------------------------------------------------------------
+-- 
+-- public export
+-- data StreamRes : (a : Type) -> Type where
+--   Err   : UVError -> StreamRes a
+--   Empty : StreamRes a
+--   Val   : a -> StreamRes a
+-- 
+-- public export
+-- data Continue = Cont | Stop
+-- 
+-- public export
+-- 0 StreamResp : (s : StreamRes a) -> Type
+-- StreamResp (Err x) = ()
+-- StreamResp Empty   = ()
+-- StreamResp (Val x) = Continue
+-- 
+-- export covering
+-- stream :
+--      {auto l : Loop}
+--   -> String
+--   -> (numBytes : Bits32)
+--   -> ((s : StreamRes ByteString) -> IO (StreamResp s))
+--   -> UVIO ()
+-- stream path nb act = do
+--   buf <- primIO $ prim__initBuf nb
+--   fileOpen path RDONLY neutral (go buf)
+-- 
+--   where
+--     cleanup : Ptr Buf -> UFile -> IO ()
+--     cleanup buf fi = fileClose fi >> freeBuf buf
+-- 
+--     covering
+--     go : Ptr Buf -> UFile -> IO ()
+--     go buf fi@(MkUFile f h) = do
+--       res <- primIO $ prim__uv_fs_read l.loop f h buf (-1) $ \fp => toPrim $ do
+--         n <- fileRes fp 
+--         cleanupFP fp
+--         if n == 0
+--            then cleanup buf fi >> act Empty
+--            else
+--              if n < 0
+--                 then cleanup buf fi >> act (Err $ fromCode n)
+--                 else do
+--                   bs <- copyData buf (cast n)
+--                   Cont <- act (Val bs) | Stop => cleanup buf fi 
+--                   go buf fi
+--       when (res < 0) (cleanup buf fi >> act (Err $ fromCode res))

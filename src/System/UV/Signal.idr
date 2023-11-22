@@ -3,15 +3,13 @@ module System.UV.Signal
 import Control.Monad.Either
 import Derive.Prelude
 import System.UV.Error
+import System.UV.Handle
 import System.UV.Loop
 import System.UV.Util
 import System.FFI
 
 %default total
 %language ElabReflection
-
-export
-data Signal : Type where
 
 ||| Signalcodes we can react on.
 public export
@@ -33,18 +31,18 @@ data SigCode : Type where
 -- FFI
 --------------------------------------------------------------------------------
 
-%foreign (idris_uv "uv_init_signal")
-prim__initSignal : Ptr LoopPtr -> PrimIO (Ptr Signal)
+%foreign (idris_uv "uv_signal_init")
+prim__uv_signal_init : Ptr LoopPtr -> Ptr Signal -> PrimIO Int64
 
 %foreign (idris_uv "uv_signal_start")
-prim__startSignal :
+prim__uv_signal_start :
      Ptr Signal
   -> (Ptr Signal -> Int64 -> PrimIO ())
   -> Int64
   -> PrimIO Int64
 
 %foreign (idris_uv "uv_signal_stop")
-prim__stopSignal : Ptr Signal -> PrimIO Int64
+prim__uv_signal_stop : Ptr Signal -> PrimIO Int64
 
 %foreign (idris_uv "uv_sigabrt")
 prim__SIGABRT : Int64
@@ -94,15 +92,19 @@ code SIGTRAP = prim__SIGTRAP
 code SIGUSR1 = prim__SIGUSR1
 code SIGUSR2 = prim__SIGUSR2
 
-freeSignal : Ptr Signal -> IO ()
-freeSignal ptr = do
-  _ <- primIO $ prim__stopSignal ptr
-  free $ prim__forgetPtr ptr
+export %inline
+signalInit : Loop => Ptr Signal -> UVIO ()
+signalInit @{MkLoop ptr} si = primUV (prim__uv_signal_init ptr si)
 
-export
-onSignal : Loop => SigCode -> IO () -> UVIO Resource
-onSignal @{MkLoop ptr} c f = do
-  si <- primIO $ prim__initSignal ptr
-  re <- handle (freeSignal si)
-  _  <- primIO $ prim__startSignal si (\p,s => toPrim $ f >> release re) (code c)
-  pure re
+export %inline
+signalStart :
+     Ptr Signal
+  -> (Ptr Signal -> Int64 -> IO ())
+  -> SigCode
+  -> UVIO ()
+signalStart ptr f c =
+  primUV $ prim__uv_signal_start ptr (\p,s => toPrim $ f p s) (code c)
+
+export %inline
+signalStop : Ptr Signal -> UVIO ()
+signalStop ptr = primUV $ prim__uv_signal_stop ptr

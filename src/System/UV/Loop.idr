@@ -1,6 +1,6 @@
 module System.UV.Loop
 
-import Control.Monad.Either
+import public Control.Monad.Either
 import Data.IORef
 import System
 import System.UV.Error
@@ -29,13 +29,14 @@ record Resource where
   constructor R
   ref : IORef (IO ())
 
-unit : IO ()
-unit = pure ()
+export %inline
+unitIO : IO ()
+unitIO = pure ()
 
 export
 release : Resource -> IO ()
 release (R ref) = do
-  join (readIORef ref) >> writeIORef ref unit
+  join (readIORef ref) >> writeIORef ref unitIO
 
 export %inline
 handle : HasIO io => IO () -> io (Resource)
@@ -67,7 +68,7 @@ defaultLoop = MkLoop <$> primIO prim__defaultLoop
 ||| a covering action.
 covering export %inline
 runLoop : Loop -> UVIO ()
-runLoop (MkLoop ptr) = primUV $ prim__loopRun ptr 0
+runLoop l = primUV $ prim__loopRun l.loop 0
 
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.

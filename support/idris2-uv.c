@@ -3,38 +3,11 @@
 #include <string.h>
 #include <uv.h>
 
-// Allocate memory for a timer and initialize it at the
-// event loop
-uv_timer_t* uv_init_timer(uv_loop_t* loop){
-  uv_timer_t* timer = malloc(sizeof(uv_timer_t));
-  uv_timer_init(loop, timer);
-  return timer;
-}
-
-// Allocate memory for a signal handler and initialize it at the
-// event loop
-uv_signal_t* uv_init_signal(uv_loop_t* loop){
-  uv_signal_t* signal = malloc(sizeof(uv_signal_t));
-  uv_signal_init(loop, signal);
-  return signal;
-}
-
-// Allocate memory for a file handle
-uv_fs_t* uv_alloc_fs(){
-  uv_fs_t* fs = malloc(sizeof(uv_fs_t));
-  return fs;
-}
-
-// Extract the result int from an `uv_fs_t`.
-int uv_fs_result(uv_fs_t* fs){
-  return fs->result;
-}
-
 // Allocate memore for reading a char array of the given
 // length and initialize an `uv_buf_t` with this.
 uv_buf_t* uv_init_buf(unsigned int length){
   char *dat = NULL;
-  dat = malloc(length * sizeof *dat);
+  dat = malloc(length);
   uv_buf_t* buf = malloc(sizeof(uv_buf_t));
   *buf = uv_buf_init(dat,length);
   return buf;
@@ -45,13 +18,12 @@ void* uv_free_buf(uv_buf_t* buf){
   free(buf);
 }
 
-void* uv_copy_buf(uv_buf_t* buf, char* dest){
-  memcpy(dest, buf->base, buf->len);
+void* uv_set_buf_len(uv_buf_t* buf, unsigned int length){
+  buf->len = length;
 }
 
-// Read data from a file
-int uv_read_fs(uv_loop_t *loop, uv_fs_t *req, uv_file file, uv_buf_t* buf, int64_t offset, uv_fs_cb cb){
-  return uv_fs_read(loop, req, file, buf, 1, offset, cb);
+void* uv_copy_buf(uv_buf_t* buf, char* dest, int len){
+  memcpy(dest, buf->base, len);
 }
 
 int uv_sigabrt() {return SIGABRT;}
@@ -83,3 +55,34 @@ int uv_S_IRWXO() {return S_IRWXO;}
 int uv_S_IROTH() {return S_IROTH;}
 int uv_S_IWOTH() {return S_IWOTH;}
 int uv_S_IXOTH() {return S_IXOTH;}
+
+int uv_UNKNOWN_HANDLE() {return UV_UNKNOWN_HANDLE;}
+int uv_ASYNC() {return UV_ASYNC;}
+int uv_CHECK() {return UV_CHECK;}
+int uv_FS_EVENT() {return UV_FS_EVENT;}
+int uv_FS_POLL() {return UV_FS_POLL;}
+int uv_HANDLE() {return UV_HANDLE;}
+int uv_IDLE() {return UV_IDLE;}
+int uv_NAMED_PIPE() {return UV_NAMED_PIPE;}
+int uv_POLL() {return UV_POLL;}
+int uv_PREPARE() {return UV_PREPARE;}
+int uv_PROCESS() {return UV_PROCESS;}
+int uv_STREAM() {return UV_STREAM;}
+int uv_TCP() {return UV_TCP;}
+int uv_TIMER() {return UV_TIMER;}
+int uv_TTY() {return UV_TTY;}
+int uv_UDP() {return UV_UDP;}
+int uv_SIGNAL() {return UV_SIGNAL;}
+int uv_FILE() {return UV_FILE;}
+
+int uv_UNKNOWN_REQ() {return UV_UNKNOWN_REQ;}
+int uv_REQ() {return UV_REQ;}
+int uv_CONNECT() {return UV_CONNECT;}
+int uv_WRITE() {return UV_WRITE;}
+int uv_SHUTDOWN() {return UV_SHUTDOWN;}
+int uv_UDP_SEND() {return UV_UDP_SEND;}
+int uv_FS() {return UV_FS;}
+int uv_WORK() {return UV_WORK;}
+int uv_GETADDRINFO() {return UV_GETADDRINFO;}
+int uv_GETNAMEINFO() {return UV_GETNAMEINFO;}
+int uv_REQ_TYPE_MAX() {return UV_REQ_TYPE_MAX;}

@@ -3,23 +3,21 @@ module System.UV.Timer
 import Control.Monad.Either
 import System.FFI
 import System.UV.Error
+import System.UV.Handle
 import System.UV.Loop
 import System.UV.Util
 
 %default total
 
-export
-data Timer : Type where
-
 --------------------------------------------------------------------------------
 -- FFI
 --------------------------------------------------------------------------------
 
-%foreign (idris_uv "uv_init_timer")
-prim__initTimer : Ptr LoopPtr -> PrimIO (Ptr Timer)
+%foreign (idris_uv "uv_timer_init")
+prim__uv_timer_init : Ptr LoopPtr -> Ptr Timer -> PrimIO Int64
 
 %foreign (idris_uv "uv_timer_start")
-prim__startTimer :
+prim__uv_timer_start :
      Ptr Timer
   -> (Ptr Timer -> PrimIO ())
   -> Bits64
@@ -27,37 +25,39 @@ prim__startTimer :
   -> PrimIO Int64
 
 %foreign (idris_uv "uv_timer_stop")
-prim__stopTimer : Ptr Timer -> PrimIO Int64
+prim__uv_timer_stop : Ptr Timer -> PrimIO Int64
+
+%foreign (idris_uv "uv_timer_set_repeat")
+prim__uv_timer_set_repeat : Ptr Timer -> Bits64 -> PrimIO ()
+
+%foreign (idris_uv "uv_timer_again")
+prim__uv_timer_again : Ptr Timer -> PrimIO Int64
 
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
-%inline
-initTimer : Loop => HasIO io => io (Ptr Timer)
-initTimer @{MkLoop ptr} = primIO (prim__initTimer ptr)
+export %inline
+timerInit : Loop => Ptr Timer -> UVIO ()
+timerInit @{MkLoop ptr} ti = primUV (prim__uv_timer_init ptr ti)
 
-freeTimer : Ptr Timer -> IO ()
-freeTimer ptr = do
-  _ <- primIO (prim__stopTimer ptr)
-  free $ prim__forgetPtr ptr
+export %inline
+timerStart :
+     Ptr Timer
+  -> (Ptr Timer -> IO ())
+  -> (timeout,repeat : Bits64)
+  -> UVIO ()
+timerStart ptr f t r =
+  primUV $ prim__uv_timer_start ptr (\p => toPrim $ f p) t r
 
-%inline
-startTimer : Ptr Timer -> IO () -> (timeout,repeat : Bits64) -> UVIO ()
-startTimer ptr f t r =
-  primUV $ prim__startTimer ptr (\p => toPrim f) t r
+export %inline
+timerStop : Ptr Timer -> UVIO ()
+timerStop ptr = primUV $ prim__uv_timer_stop ptr
 
-export
-repeatedly : Loop => (timeout,repeat : Bits64) -> IO () -> UVIO Resource
-repeatedly t r run = do
-  ti <- initTimer
-  startTimer ti run t r
-  handle (freeTimer ti)
+export %inline
+timerAgain : Ptr Timer -> UVIO ()
+timerAgain ptr = primUV $ prim__uv_timer_again ptr
 
-export
-delayed : Loop => Bits64 -> IO () -> UVIO Resource
-delayed timeout run = do
-  ti <- initTimer
-  re <- handle (freeTimer ti)
-  startTimer ti (run >> release re) timeout 0
-  pure re
+export %inline
+timerSetRepeat : HasIO io => Ptr Timer -> Bits64 -> io ()
+timerSetRepeat ptr repeat = primIO $ prim__uv_timer_set_repeat ptr repeat
