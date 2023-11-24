@@ -5,6 +5,7 @@ import System.FFI
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
+import System.UV.Pointer
 import System.UV.Util
 
 %default total
@@ -14,7 +15,7 @@ import System.UV.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_timer_init")
-prim__uv_timer_init : Ptr LoopPtr -> Ptr Timer -> PrimIO Int64
+prim__uv_timer_init : Ptr LoopPtr -> Ptr Timer -> PrimIO Int32
 
 %foreign (idris_uv "uv_timer_start")
 prim__uv_timer_start :
@@ -22,16 +23,16 @@ prim__uv_timer_start :
   -> (Ptr Timer -> PrimIO ())
   -> Bits64
   -> Bits64
-  -> PrimIO Int64
+  -> PrimIO Int32
 
 %foreign (idris_uv "uv_timer_stop")
-prim__uv_timer_stop : Ptr Timer -> PrimIO Int64
+prim__uv_timer_stop : Ptr Timer -> PrimIO Int32
 
 %foreign (idris_uv "uv_timer_set_repeat")
 prim__uv_timer_set_repeat : Ptr Timer -> Bits64 -> PrimIO ()
 
 %foreign (idris_uv "uv_timer_again")
-prim__uv_timer_again : Ptr Timer -> PrimIO Int64
+prim__uv_timer_again : Ptr Timer -> PrimIO Int32
 
 --------------------------------------------------------------------------------
 -- API

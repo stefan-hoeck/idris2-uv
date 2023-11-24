@@ -2,11 +2,12 @@ module System.UV.Signal
 
 import Control.Monad.Either
 import Derive.Prelude
+import System.FFI
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
+import System.UV.Pointer
 import System.UV.Util
-import System.FFI
 
 %default total
 %language ElabReflection
@@ -32,47 +33,47 @@ data SigCode : Type where
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_signal_init")
-prim__uv_signal_init : Ptr LoopPtr -> Ptr Signal -> PrimIO Int64
+prim__uv_signal_init : Ptr LoopPtr -> Ptr Signal -> PrimIO Int32
 
 %foreign (idris_uv "uv_signal_start")
 prim__uv_signal_start :
      Ptr Signal
-  -> (Ptr Signal -> Int64 -> PrimIO ())
-  -> Int64
-  -> PrimIO Int64
+  -> (Ptr Signal -> Int32 -> PrimIO ())
+  -> Int32
+  -> PrimIO Int32
 
 %foreign (idris_uv "uv_signal_stop")
-prim__uv_signal_stop : Ptr Signal -> PrimIO Int64
+prim__uv_signal_stop : Ptr Signal -> PrimIO Int32
 
 %foreign (idris_uv "uv_sigabrt")
-prim__SIGABRT : Int64
+prim__SIGABRT : Int32
 
 %foreign (idris_uv "uv_sigfpe")
-prim__SIGFPE  : Int64
+prim__SIGFPE  : Int32
 
 %foreign (idris_uv "uv_sighup")
-prim__SIGHUP  : Int64
+prim__SIGHUP  : Int32
 
 %foreign (idris_uv "uv_sigill")
-prim__SIGILL  : Int64
+prim__SIGILL  : Int32
 
 %foreign (idris_uv "uv_sigint")
-prim__SIGINT  : Int64
+prim__SIGINT  : Int32
 
 %foreign (idris_uv "uv_sigquit")
-prim__SIGQUIT : Int64
+prim__SIGQUIT : Int32
 
 %foreign (idris_uv "uv_sigsegv")
-prim__SIGSEGV : Int64
+prim__SIGSEGV : Int32
 
 %foreign (idris_uv "uv_sigtrap")
-prim__SIGTRAP : Int64
+prim__SIGTRAP : Int32
 
 %foreign (idris_uv "uv_sigusr1")
-prim__SIGUSR1 : Int64
+prim__SIGUSR1 : Int32
 
 %foreign (idris_uv "uv_sigusr2")
-prim__SIGUSR2 : Int64
+prim__SIGUSR2 : Int32
 
 --------------------------------------------------------------------------------
 -- API
@@ -80,7 +81,7 @@ prim__SIGUSR2 : Int64
 
 ||| Converts a `SigCode` to the corresponding C constant.
 export
-code : SigCode -> Int64
+code : SigCode -> Int32
 code SIGABRT = prim__SIGABRT
 code SIGFPE  = prim__SIGFPE
 code SIGHUP  = prim__SIGHUP
@@ -99,7 +100,7 @@ signalInit @{MkLoop ptr} si = primUV (prim__uv_signal_init ptr si)
 export %inline
 signalStart :
      Ptr Signal
-  -> (Ptr Signal -> Int64 -> IO ())
+  -> (Ptr Signal -> Int32 -> IO ())
   -> SigCode
   -> UVIO ()
 signalStart ptr f c =

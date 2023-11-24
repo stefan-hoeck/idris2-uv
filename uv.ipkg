@@ -11,8 +11,12 @@ modules = System.UV
         , System.UV.Error
         , System.UV.Handle
         , System.UV.Loop
+        , System.UV.Pipe
+        , System.UV.Pointer
         , System.UV.Req
         , System.UV.Signal
+        , System.UV.Stream
+        , System.UV.TCP
         , System.UV.Timer
         , System.UV.Util
 

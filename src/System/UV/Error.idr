@@ -12,10 +12,13 @@ import System.UV.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_strerror")
-prim__uv_strerror : Int64 -> String
+prim__uv_strerror : Int32 -> String
 
 %foreign (idris_uv "uv_err_name")
-prim__uv_err_name : Int64 -> String
+prim__uv_err_name : Int32 -> String
+
+export %foreign (idris_uv "uv_EOF")
+UV_EOF : Int32
 
 --------------------------------------------------------------------------------
 -- API
@@ -25,12 +28,12 @@ prim__uv_err_name : Int64 -> String
 public export
 record UVError where
   constructor MkUVError
-  code : Int64
+  code : Int32
   name : String
   msg  : String
 
 export
-fromCode : Int64 -> UVError
+fromCode : Int32 -> UVError
 fromCode n = MkUVError n (prim__uv_err_name n) (prim__uv_strerror n)
 
 %runElab derive "UVError" [Show,Eq]
@@ -44,9 +47,9 @@ public export
 UVIO = EitherT UVError IO
 
 export
-uvRes : Int64 -> Either UVError ()
+uvRes : Int32 -> Either UVError ()
 uvRes n = if n < 0 then Left $ fromCode n else Right ()
 
 export
-primUV : PrimIO Int64 -> UVIO ()
+primUV : PrimIO Int32 -> UVIO ()
 primUV io = MkEitherT $ uvRes <$> primIO io

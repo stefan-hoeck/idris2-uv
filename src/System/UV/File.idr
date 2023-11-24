@@ -2,21 +2,34 @@ module System.UV.File
 
 import Data.Buffer.Indexed
 import Data.ByteString
-import Control.Monad.Either
 import Data.Buffer
 import System.FFI
 import System.UV.Error
 import System.UV.File.Flags
 import System.UV.Handle
 import System.UV.Loop
-import System.UV.Req
+import System.UV.Pointer
 import System.UV.Util
 
 %default total
 
-||| A `Ptr Buf` corresponst to an `un_buf_t` pointer
-export
-data Buf : Type where
+||| A file handle.
+public export
+record File where
+  constructor MkFile
+  file : Int32
+
+export %inline
+stdin : File
+stdin = MkFile 0
+
+export %inline
+stdout : File
+stdout = MkFile 1
+
+export %inline
+stderr : File
+stderr = MkFile 2
 
 --------------------------------------------------------------------------------
 -- FFI
@@ -26,17 +39,8 @@ data Buf : Type where
          "node:lambda:s=>Buffer.alloc(s)"
 prim__newBuf : Bits32 -> PrimIO Buffer
 
-%foreign (idris_uv "uv_init_buf")
-prim__uv_init_buf : Bits32 -> PrimIO (Ptr Buf)
-
-%foreign (idris_uv "uv_set_buf_len")
-prim__uv_set_buf_len : Ptr Buf -> Bits32 -> PrimIO ()
-
-%foreign (idris_uv "uv_free_buf")
-prim__uv_free_buf : Ptr Buf -> PrimIO ()
-
 %foreign (idris_uv "uv_fs_get_result")
-prim__uv_fs_get_result : Ptr Fs -> PrimIO Int64
+prim__uv_fs_get_result : Ptr Fs -> PrimIO Int32
 
 %foreign (idris_uv "uv_copy_buf")
 prim__uv_copy_to_buf : Ptr Buf -> Buffer -> Bits32 -> PrimIO ()
@@ -54,69 +58,102 @@ prim__uv_fs_open :
   -> String
   -> (flags,mode : Bits32)
   -> (cb : Ptr Fs -> PrimIO ())
-  -> PrimIO Int64
+  -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_read")
 prim__uv_fs_read :
      Ptr LoopPtr
   -> Ptr Fs
-  -> (file   : Int64)
+  -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int64)
+  -> (offset : Int32)
   -> (cb     : Ptr Fs -> PrimIO ())
-  -> PrimIO Int64
+  -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_write")
 prim__uv_fs_write :
      Ptr LoopPtr
   -> Ptr Fs
-  -> (file   : Int64)
+  -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int64)
+  -> (offset : Int32)
   -> (cb     : Ptr Fs -> PrimIO ())
-  -> PrimIO Int64
+  -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_close")
 prim__uv_fs_close :
      Ptr LoopPtr
   -> Ptr Fs
-  -> (file : Int64)
+  -> (file : Int32)
   -> (cb   : Ptr Fs -> PrimIO ())
-  -> PrimIO Int64
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_close_sync")
+prim__uv_fs_close_sync : Ptr LoopPtr -> (file : Int32) -> PrimIO Int32
 
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
-||| Frees a file reading buffer allocated with `allocBuf`.
+||| Creates a new byte vector of the given size.
+|||
+||| Note: On the scheme backends, the returned buffer is managed by the runtime
+|||       so it needs not be released manually.
 export %inline
-freeBuf : HasIO io => Ptr Buf -> io ()
-freeBuf p = primIO $ prim__uv_free_buf p
-
-||| Allocate a buffer for file reading. Make sure to release this with
-||| `freeBuf` once it is no longer needed.
-export %inline
-allocBuf : HasIO io => Bits32 -> io (Ptr Buf)
-allocBuf p = primIO $ prim__uv_init_buf p
-
-export %inline
-setBufLen : HasIO io => Ptr Buf -> Bits32 -> io ()
-setBufLen p len = primIO $ prim__uv_set_buf_len p len
+newBuffer : HasIO io => Bits32 -> io Buffer
+newBuffer size = primIO $ prim__newBuf size
 
 ||| Returns the result code received after a file operation.
 export %inline
-fsResult : HasIO io => Ptr Fs -> io Int64
+fsResult : HasIO io => Ptr Fs -> io Int32
 fsResult p = primIO $ prim__uv_fs_get_result p
 
-||| Synchronously closes a file and releases the file handle.
+||| Returns the file handle associated with an `uv_fs_t` handle.
+|||
+||| This reads the same field as `fsResult` but interprets a negative
+||| number as an error and a non-negative result as a file handle.
+export
+fsFile : HasIO io => Ptr Fs -> io (Either UVError File)
+fsFile p = do
+  n <- fsResult p
+  pure $ if n < 0 then Left (fromCode n) else Right (MkFile n)
+
+||| Asynchronously closes a file and releases the file handle.
 |||
 ||| Once the file is closed, the given `IO` action is invoked.
+||| Note: Consider using the synchronous version `fsClose` instead for simplicity.
+|||       Closing a file will probably not have a significant blocking effect.
 export %inline
-fsClose : (l : Loop) => Ptr Fs -> Int64 -> (Ptr Fs -> IO ()) -> UVIO ()
-fsClose fs h run = do
-  primUV $ prim__uv_fs_close l.loop fs h (\p => toPrim $ run p)
+fsCloseAsync : (l : Loop) => Ptr Fs -> File -> (Ptr Fs -> IO ()) -> UVIO ()
+fsCloseAsync fs h run = do
+  primUV $ prim__uv_fs_close l.loop fs h.file (\p => toPrim $ run p)
+
+||| Synchronously closes a file and releases the file handle.
+export %inline
+fsClose : (l : Loop) => File -> UVIO ()
+fsClose h = primUV $ prim__uv_fs_close_sync l.loop h.file
+
+||| Asynchronously opens a file, invoking the given callback once
+||| the file is ready.
+|||
+||| This is a faithful binding to `uv_fs_open`. What you typicall want is
+||| to use the file handle (if any) or an error message in the callback
+||| and work with that. For that, there is `fsOpen` as a more convenient
+||| version.
+export %inline
+fsOpenRaw :
+     {auto l : Loop}
+  -> Ptr Fs
+  -> String
+  -> Flags
+  -> Mode
+  -> (Ptr Fs -> IO ())
+  -> UVIO ()
+fsOpenRaw ptr path fs m act = do
+  primUV $ prim__uv_fs_open l.loop ptr path fs.flags m.mode $
+    \p => toPrim (act p)
 
 ||| Asynchronously opens a file, invoking the given callback once
 ||| the file is ready.
@@ -127,43 +164,97 @@ fsOpen :
   -> String
   -> Flags
   -> Mode
-  -> (Ptr Fs -> IO ())
+  -> (Either UVError File -> IO ())
   -> UVIO ()
-fsOpen ptr path fs m act = do
-  primUV $ prim__uv_fs_open l.loop ptr path fs.flags m.mode $
-    \p => toPrim (act p)
+fsOpen ptr path fs m act =
+  fsOpenRaw ptr path fs m $ \p => fsFile p >>= act
 
 ||| Reads data from a file into the given buffer and invokes
 ||| the callback function once the data is ready.
+|||
+||| This is a faithful binding to `uv_fs_read`. What you typically want is
+||| to decide on the return value stored in the `Ptr Fs` you get to figure
+||| out what to do next. For that, there is `fsRead` as a more convenient
+||| version.
+export %inline
+fsReadRaw :
+     {auto l : Loop}
+  -> Ptr Fs
+  -> (file   : File)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
+  -> (offset : Int32)
+  -> (cb     : Ptr Fs -> IO ())
+  -> UVIO ()
+fsReadRaw f h bufs nbufs offset act =
+  primUV $ prim__uv_fs_read l.loop f h.file bufs nbufs offset $
+    \fp => toPrim (act fp)
+
+public export
+data ReadRes : (a : Type) -> Type where
+  Err    : UVError -> ReadRes s
+  NoData : ReadRes a
+  Data   : a -> ReadRes a
+
+export
+codeToRes : Int32 -> ReadRes Bits32
+codeToRes 0 = NoData
+codeToRes n = if n < 0 then Err (fromCode n) else Data (cast n)
+
+||| Convenience version of `fsReadRaw` where the amount of
+||| data read is analyzed and passed as a data type to the callback.
 export
 fsRead :
      {auto l : Loop}
   -> Ptr Fs
-  -> (file   : Int64)
+  -> (file   : File)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int64)
-  -> (cb     : Ptr Fs -> IO ())
+  -> (offset : Int32)
+  -> (cb     : ReadRes Bits32 -> IO ())
   -> UVIO ()
-fsRead f h bufs nbufs offset act =
-  primUV $ prim__uv_fs_read l.loop f h bufs nbufs offset $
-    \fp => toPrim (act fp)
+fsRead f h bufs nbufs offset act = do
+  fsReadRaw f h bufs nbufs offset $ \req => do
+    n <- fsResult req
+    act $ codeToRes n
 
 ||| Writes data from the given buffer to a file and invokes
 ||| the callback function once the data is ready.
+|||
+||| This is a faithful binding to `uv_fs_write`. What you typically want is
+||| to decide on the return value stored in the `Ptr Fs` you get to figure
+||| out what to do next. For that, there is `fsWrite` as a more convenient
+||| version.
+export %inline
+fsWriteRaw :
+     {auto l : Loop}
+  -> Ptr Fs
+  -> (file   : File)
+  -> (bufs   : Ptr Buf)
+  -> (nbufs  : Bits32)
+  -> (offset : Int32)
+  -> (cb     : Ptr Fs -> IO ())
+  -> UVIO ()
+fsWriteRaw f h bufs nbufs offset act =
+  primUV $ prim__uv_fs_write l.loop f h.file bufs nbufs offset $
+    \fp => toPrim (act fp)
+
+||| Convenience version of `fsWriteRaw` where the write result
+||| is analyzed and passed as a potential error to the callback.
 export
 fsWrite :
      {auto l : Loop}
   -> Ptr Fs
-  -> (file   : Int64)
+  -> (file   : File)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int64)
-  -> (cb     : Ptr Fs -> IO ())
+  -> (offset : Int32)
+  -> (cb     : Maybe UVError -> IO ())
   -> UVIO ()
 fsWrite f h bufs nbufs offset act =
-  primUV $ prim__uv_fs_write l.loop f h bufs nbufs offset $
-    \fp => toPrim (act fp)
+  fsWriteRaw f h bufs nbufs offset $ \req => do
+    n <- fsResult req
+    if n < 0 then act (Just $ fromCode n) else act Nothing
 
 ||| Copies data from a byte array handled by libuv to an
 ||| Idris buffer.
@@ -192,7 +283,7 @@ fsCleanup fp = primIO $ prim__uv_fs_req_cleanup fp
 --      {auto l : Loop}
 --   -> UFile
 --   -> (numBytes : Bits32)
---   -> (position : Int64)
+--   -> (position : Int32)
 --   -> (Either UVError ByteString -> IO ())
 --   -> UVIO ()
 -- fileRead @{MkLoop l} (MkUFile f h) numBytes pos act = MkEitherT $ do

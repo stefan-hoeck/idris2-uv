@@ -50,7 +50,7 @@ handle = map R . newIORef
 prim__defaultLoop : PrimIO (Ptr LoopPtr)
 
 covering %foreign (idris_uv "uv_run")
-prim__loopRun : Ptr LoopPtr -> Bits32 -> PrimIO Int64
+prim__loopRun : Ptr LoopPtr -> Bits32 -> PrimIO Int32
 
 --------------------------------------------------------------------------------
 -- API

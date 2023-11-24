@@ -4,7 +4,7 @@ import System.UV
 
 run : Loop => UVIO ()
 run = do
-  ti <- mallocHandle TIMER
+  ti <- mallocPtr Timer
   timerInit ti
   timerStart ti (\_ => putStrLn "timer fired!") 1000 0
 

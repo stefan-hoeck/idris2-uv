@@ -1,10 +1,24 @@
-uv_buf_t* uv_init_buf(unsigned int length);
+char* uv_get_buf_base(uv_buf_t* buf);
+
+unsigned int* uv_get_buf_len(uv_buf_t* buf);
+
+void* uv_set_buf_base(uv_buf_t* buf, char* dat);
 
 void* uv_set_buf_len(uv_buf_t* buf, unsigned int length);
 
-void* uv_free_buf(uv_buf_t* buf);
-
 void* uv_copy_buf(uv_buf_t* buf, char* dest, int len);
+
+void* uv_init_buf(uv_buf_t* buf, char *base, unsigned int len);
+
+int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
+
+size_t uv_sockaddr_in_size();
+
+size_t uv_sockaddr_in6_size();
+
+size_t uv_sockaddr_size();
+
+int uv_EOF();
 
 int uv_sigabrt();
 int uv_sigfpe();
@@ -36,7 +50,6 @@ int uv_S_IROTH();
 int uv_S_IWOTH();
 int uv_S_IXOTH();
 
-int uv_UNKNOWN_HANDLE();
 int uv_ASYNC();
 int uv_CHECK();
 int uv_FS_EVENT();
@@ -53,9 +66,7 @@ int uv_TIMER();
 int uv_TTY();
 int uv_UDP();
 int uv_SIGNAL();
-int uv_FILE();
 
-int uv_UNKNOWN_REQ();
 int uv_REQ();
 int uv_CONNECT();
 int uv_WRITE();
@@ -65,4 +76,7 @@ int uv_FS();
 int uv_WORK();
 int uv_GETADDRINFO();
 int uv_GETNAMEINFO();
-int uv_REQ_TYPE_MAX();
+
+int uv_buf_size();
+
+int uv_EOF();

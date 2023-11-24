@@ -3,7 +3,8 @@ module Main
 import System.UV
 import Timer
 import FileIO
+import Echo
 
 
 main : IO ()
-main = FileIO.main
+main = Echo.main

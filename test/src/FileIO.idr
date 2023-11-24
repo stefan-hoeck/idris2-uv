@@ -8,53 +8,36 @@ parameters {auto l : Loop}
            (openReq, readReq, writeReq : Ptr Fs)
            (iov : Ptr Buf)
 
-  onWrite : Ptr Fs -> UVIO ()
+  onWrite : File -> Maybe UVError -> UVIO ()
 
-  onRead : Ptr Fs -> UVIO ()
+  onRead : File -> ReadRes Bits32 -> UVIO ()
 
-  onOpen : Ptr Fs -> UVIO ()
+  onWrite h (Just err) = putStrLn "Write error: \{err}"
+  onWrite h Nothing    = fsRead readReq h iov 1 (-1) (runUVIO . onRead h)
 
-  onWrite req = do
-    n  <- fsResult req
-    oh <- fsResult openReq
-    if n < 0
-       then putStrLn "Write error: \{fromCode n}"
-       else fsRead readReq oh iov 1 (-1) (runUVIO . onRead)
+  onRead h (Err err) = putStrLn "Read error: \{err}"
+  onRead h NoData    = fsClose h
+  onRead h (Data n)  = do
+    setBufLen iov (cast n)
+    fsWrite writeReq stdout iov 1 (-1) (runUVIO . onWrite h)
 
-  onRead req = do
-    n  <- fsResult req
-    oh <- fsResult openReq
-    if n < 0
-       then putStrLn "Read error: \{fromCode n}"
-       else
-         if n == 0
-            then do
-              closeReq <- mallocReq FS
-              fsClose closeReq oh (const unitIO)
-            else do
-              setBufLen iov (cast n)
-              fsWrite writeReq 1 iov 1 (-1) (runUVIO . onWrite)
-
-  onOpen req = do
-    n  <- fsResult req
-    oh <- fsResult openReq
-    if n < 0
-       then putStrLn "Opening error: \{fromCode n}"
-       else fsRead readReq oh iov 1 (-1) (runUVIO . onRead)
+  onOpen : Either UVError File -> UVIO ()
+  onOpen (Left err) = putStrLn "Opening error: \{err}"
+  onOpen (Right h)  = fsRead readReq h iov 1 (-1) (runUVIO . onRead h)
 
 export
 main : IO ()
 main = do
-  fo  <- mallocReq FS
-  fr  <- mallocReq FS
-  fw  <- mallocReq FS
-  iov <- allocBuf 0xffff
+  fo  <- mallocPtr Fs
+  fr  <- mallocPtr Fs
+  fw  <- mallocPtr Fs
+  iov <- mallocBuf 0xffff
 
   runUV $ fsOpen fo "pack.toml" RDONLY neutral (runUVIO . onOpen fo fr fw iov)
   fsCleanup fo
   fsCleanup fr
   fsCleanup fw
-  freeHandle fo
-  freeHandle fr
-  freeHandle fw
+  freePtr fo
+  freePtr fr
+  freePtr fw
   freeBuf iov
