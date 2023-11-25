@@ -14,12 +14,6 @@ void* uv_init_buf(uv_buf_t* buf, char *base, unsigned int len);
 
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
 
-size_t uv_sockaddr_in_size();
-
-size_t uv_sockaddr_in6_size();
-
-size_t uv_sockaddr_size();
-
 int uv_EOF();
 
 // `addrinfo` setters and getters
@@ -61,53 +55,56 @@ int uv_append();
 int uv_creat();
 
 // File creation modes
-int uv_S_IRWXU();
-int uv_S_IRUSR();
-int uv_S_IWUSR();
-int uv_S_IXUSR();
-int uv_S_IRWXG();
-int uv_S_IRGRP();
-int uv_S_IWGRP();
-int uv_S_IXGRP();
-int uv_S_IRWXO();
-int uv_S_IROTH();
-int uv_S_IWOTH();
-int uv_S_IXOTH();
+int uv_s_irwxu();
+int uv_s_irusr();
+int uv_s_iwusr();
+int uv_s_ixusr();
+int uv_s_irwxg();
+int uv_s_irgrp();
+int uv_s_iwgrp();
+int uv_s_ixgrp();
+int uv_s_irwxo();
+int uv_s_iroth();
+int uv_s_iwoth();
+int uv_s_ixoth();
 
 // Handle types
-int uv_ASYNC();
-int uv_CHECK();
-int uv_FS_EVENT();
-int uv_FS_POLL();
-int uv_HANDLE();
-int uv_IDLE();
-int uv_NAMED_PIPE();
-int uv_POLL();
-int uv_PREPARE();
-int uv_PROCESS();
-int uv_STREAM();
-int uv_TCP();
-int uv_TIMER();
-int uv_TTY();
-int uv_UDP();
-int uv_SIGNAL();
+size_t uv_async_sz();
+size_t uv_check_sz();
+size_t uv_fs_event_sz();
+size_t uv_fs_poll_sz();
+size_t uv_handle_sz();
+size_t uv_idle_sz();
+size_t uv_named_pipe_sz();
+size_t uv_poll_sz();
+size_t uv_prepare_sz();
+size_t uv_process_sz();
+size_t uv_stream_sz();
+size_t uv_tcp_sz();
+size_t uv_timer_sz();
+size_t uv_tty_sz();
+size_t uv_udp_sz();
+size_t uv_signal_sz();
 
 // Request types
-int uv_REQ();
-int uv_CONNECT();
-int uv_WRITE();
-int uv_SHUTDOWN();
-int uv_UDP_SEND();
-int uv_FS();
-int uv_WORK();
-int uv_GETADDRINFO();
-int uv_GETNAMEINFO();
+size_t uv_req_sz();
+size_t uv_connect_sz();
+size_t uv_write_sz();
+size_t uv_shutdown_sz();
+size_t uv_udp_send_sz();
+size_t uv_fs_sz();
+size_t uv_work_sz();
+size_t uv_getaddrinfo_sz();
+size_t uv_getnameinfo_sz();
 
 // Size of uv_buf struct
-int uv_buf_size();
+size_t uv_buf_sz();
 
 // addrinfo constants
-int uv_addrinfo_size();
+size_t uv_addrinfo_sz();
+size_t uv_sockaddr_in_sz();
+size_t uv_sockaddr_in6_sz();
+size_t uv_sockaddr_sz();
 
 // ai_family constants
 int uv_af_inet();

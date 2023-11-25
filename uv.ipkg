@@ -24,6 +24,9 @@ modules = System.UV
         , System.UV.File
         , System.UV.File.Flags
 
+        , System.UV.Raw.Pointer
+        , System.UV.Raw.Util
+
 sourcedir = "src"
 
 prebuild = "make -C support"
