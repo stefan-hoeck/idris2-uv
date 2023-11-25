@@ -10,7 +10,7 @@ import System.UV.TCP
 
 allocBuf : Bits32 -> Ptr Buf -> IO ()
 allocBuf s buf = do
-  cs <- mallocPtrs String s
+  cs <- mallocPtrs Bits8 s
   setBufBase buf cs
   setBufLen buf s
 
@@ -30,7 +30,8 @@ echoRead client nread buf = do
       freeBufBase buf
     NoData  => freeBufBase buf
     Data x  => do
-      putStrLn "Got some data!"
+      str  <- getString . castPtr <$> getBufBase buf
+      putStrLn "Got some data: \{str}"
       req  <- mallocPtr Write
       runUVIO $ write req client buf 1 (echoWrite buf)
 
@@ -62,8 +63,9 @@ prog : Loop => UVIO ()
 prog = do
   hints  <- mallocPtr AddrInfo
   res    <- mallocPtr GetAddrInfo
-  setFamily hints AF_INET
+  setFamily   hints AF_INET
   setSockType hints Stream
+  setProtocol hints IPPROTO_TCP
   getAddrInfo res onResolved "localhost" "6000" hints
 
 export

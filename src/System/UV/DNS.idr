@@ -100,13 +100,13 @@ uv_getaddrinfo :
 uv_getnameinfo :
      Ptr LoopPtr
   -> Ptr GetNameInfo
-  -> (Ptr GetAddrInfo -> Int32 -> (hostname, servie : Ptr String) -> PrimIO ())
+  -> (Ptr GetAddrInfo -> Int32 -> (hostname, servie : Ptr Char) -> PrimIO ())
   -> Ptr SockAddr
   -> (flags : Int32)
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_ip4_name")
-uv_ip4_name : Ptr SockAddrIn -> Ptr String -> Bits32 -> PrimIO ()
+uv_ip4_name : Ptr SockAddrIn -> Ptr Char -> Bits32 -> PrimIO ()
 
 --------------------------------------------------------------------------------
 -- API
@@ -192,8 +192,8 @@ setSockType : HasIO io => Ptr AddrInfo -> SocketType -> io ()
 setSockType p s = primIO $ uv_set_ai_socktype p (socketCode s)
 
 export %inline
-setProtocol : HasIO io => Ptr AddrInfo -> Int32 -> io ()
-setProtocol p v = primIO $ uv_set_ai_protocol p v
+setProtocol : HasIO io => Ptr AddrInfo -> Protocol -> io ()
+setProtocol p v = primIO $ uv_set_ai_protocol p (protocolCode v)
 
 export %inline
 setFlags : HasIO io => Ptr AddrInfo -> Int32 -> io ()
@@ -253,7 +253,7 @@ getNameInfo pa cb sa flags =
 export
 ip4Name : HasIO io => (0 p : PCast t SockAddrIn) => Ptr t -> io String
 ip4Name p = do
-  str <- mallocPtrs String 512
+  str <- mallocPtrs Char 512
   primIO $ uv_ip4_name (castPtr p) str 511
   res <- pure $ getString str
   freePtr str

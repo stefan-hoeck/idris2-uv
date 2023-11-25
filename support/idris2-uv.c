@@ -3,6 +3,8 @@
 #include <string.h>
 #include <uv.h>
 
+uv_buf_t uv_deref_buf(uv_buf_t* ptr) {return *ptr;}
+
 void* uv_set_buf_len(uv_buf_t* buf, unsigned int length){
   buf->len = length;
 }

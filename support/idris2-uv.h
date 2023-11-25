@@ -1,3 +1,5 @@
+uv_buf_t uv_deref_buf(uv_buf_t* ptr);
+
 char* uv_get_buf_base(uv_buf_t* buf);
 
 unsigned int* uv_get_buf_len(uv_buf_t* buf);

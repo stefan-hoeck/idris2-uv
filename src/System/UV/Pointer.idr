@@ -1,5 +1,7 @@
 module System.UV.Pointer
 
+import Data.Buffer.Indexed
+import Data.ByteString
 import System.FFI
 import System.UV.Util
 
@@ -12,12 +14,23 @@ import System.UV.Util
 export
 data Buf : Type where
 
-export %inline
-getString : Ptr String -> String
-getString = prim__getString
+--------------------------------------------------------------------------------
+-- String Conversions
+--------------------------------------------------------------------------------
 
+||| Convert a `Ptr Char` to an Idris string.
+|||
+||| Note: Users must make sure that the given pointer points at a
+||| zero-terminated byte array. As an alternative, consider converting
+||| a `Ptr Bits8`.
 export %inline
-getStringMay : Ptr String -> Maybe String
+getString : Ptr Char -> String
+getString p = prim__getString (believe_me p)
+
+||| Like `getString` but returns `Nothing` in case the given pointer is the
+||| null pointer.
+export %inline
+getStringMay : Ptr Char -> Maybe String
 getStringMay p =
   case prim__nullPtr p of
     0 => Just $ getString p
@@ -27,20 +40,34 @@ getStringMay p =
 -- FFI
 --------------------------------------------------------------------------------
 
+%foreign "scheme:blodwen-new-buffer"
+         "RefC:newBuffer"
+         "node:lambda:s=>Buffer.alloc(s)"
+prim__newBuffer : Bits32 -> PrimIO Buffer
+
 %foreign (idris_uv "uv_set_buf_len")
-prim__uv_set_buf_len : Ptr Buf -> Bits32 -> PrimIO ()
+uv_set_buf_len : Ptr Buf -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_set_buf_base")
-prim__uv_set_buf_base : Ptr Buf -> Ptr String -> PrimIO ()
+uv_set_buf_base : Ptr Buf -> Ptr Bits8 -> PrimIO ()
 
 %foreign (idris_uv "uv_get_buf_len")
-prim__uv_get_buf_len : Ptr Buf -> PrimIO Bits32
+uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_buf_base")
-prim__uv_get_buf_base : Ptr Buf -> PrimIO (Ptr String)
+uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 
 %foreign (idris_uv "uv_init_buf")
-prim__uv_init_buf : Ptr Buf -> Ptr String -> Bits32 -> PrimIO ()
+uv_init_buf : Ptr Buf -> Ptr Bits8 -> Bits32 -> PrimIO ()
+
+%foreign (idris_uv "uv_copy_buf")
+uv_copy_to_buf : Ptr Buf -> Buffer -> Bits32 -> PrimIO ()
+
+%foreign (idris_uv "uv_copy_buf")
+uv_copy_from_buf : Buffer -> Ptr Buf -> Bits32 -> PrimIO ()
+
+%foreign "scheme:blodwen-buffer-getstring"
+uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
 
 export %foreign (idris_uv "uv_ASYNC")
 ASYNC_SIZE : Bits32
@@ -267,7 +294,8 @@ data PSize : (a : Type) -> (s : Bits32) -> Type where
   SOCKADDRIN     : PSize SockAddrIn SOCKADDR_IN_SIZE
   SOCKADDRIN6    : PSize SockAddrIn6 SOCKADDR_IN6_SIZE
   BUF            : PSize Buf BUF_SIZE
-  STRING         : PSize String 1
+  BYTE           : PSize Bits8 1
+  CHAR           : PSize Char 1
 
 ||| Allocates a pointer for a type of a known pointer size.
 export %inline
@@ -330,6 +358,8 @@ data PCast : Type -> Type -> Type where
   IP4Addr              : PCast SockAddrIn SockAddr
   RevIP4Addr           : PCast SockAddr SockAddrIn
   IP6Addr              : PCast SockAddrIn6 SockAddr
+  ByteChar             : PCast Bits8 Char
+  CharByte             : PCast Char Bits8
 
 export
 castPtr : (0 _ : PCast s t) => Ptr s -> Ptr t
@@ -341,30 +371,30 @@ castPtr = believe_me
 
 export %inline
 setBufLen : HasIO io => Ptr Buf -> Bits32 -> io ()
-setBufLen p s = primIO $ prim__uv_set_buf_len p s
+setBufLen p s = primIO $ uv_set_buf_len p s
 
 export %inline
-setBufBase : HasIO io => Ptr Buf -> Ptr String -> io ()
-setBufBase p s = primIO $ prim__uv_set_buf_base p s
+setBufBase : HasIO io => Ptr Buf -> Ptr Bits8 -> io ()
+setBufBase p s = primIO $ uv_set_buf_base p s
 
 export %inline
 getBufLen : HasIO io => Ptr Buf -> io Bits32
-getBufLen p = primIO $ prim__uv_get_buf_len p
+getBufLen p = primIO $ uv_get_buf_len p
 
 export %inline
-getBufBase : HasIO io => Ptr Buf -> io (Ptr String)
-getBufBase p = primIO $ prim__uv_get_buf_base p
+getBufBase : HasIO io => Ptr Buf -> io (Ptr Bits8)
+getBufBase p = primIO $ uv_get_buf_base p
 
 export %inline
-initBuf : HasIO io => Ptr Buf -> Ptr String -> Bits32 -> io ()
-initBuf buf dat len = primIO $ prim__uv_init_buf buf dat len
+initBuf : HasIO io => Ptr Buf -> Ptr Bits8 -> Bits32 -> io ()
+initBuf buf dat len = primIO $ uv_init_buf buf dat len
 
 ||| Allocates a char array of the given length, wrapping it
 ||| in an `uv_buf_t` that's being initialized.
 export
 mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
 mallocBuf size = do
-  dat <- mallocPtrs String size
+  dat <- mallocPtrs Bits8 size
   buf <- mallocPtr Buf
   initBuf buf dat size
   pure buf
@@ -381,3 +411,18 @@ freeBufBase buf = getBufBase buf >>= freePtr
 export %inline
 freeBuf : HasIO io => Ptr Buf -> io ()
 freeBuf buf = freeBufBase buf >> freePtr buf
+
+||| Reads `n` bytes of data from the byte array in a `uv_buf_t`
+||| into an Idris-managed immutable `ByteString`
+export
+toByteString : HasIO io => Ptr Buf -> Bits32 -> io ByteString
+toByteString p x = do
+  buf <- primIO $ prim__newBuffer x
+  primIO $ uv_copy_to_buf p buf x
+  pure $ unsafeByteString (cast x) buf
+
+||| Reads `n` bytes of data from the byte array in a `uv_buf_t`
+||| into an Idris-managed string.
+export %inline
+toString : HasIO io => Ptr Buf -> Bits32 -> io String
+toString p s = toString <$> toByteString p s
