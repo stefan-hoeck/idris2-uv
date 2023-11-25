@@ -5,12 +5,24 @@ brief   = "Idris2 bindings to libuv"
 
 depends = base >= 0.6.0
         , elab-util
+        , bytestring
 
 modules = System.UV
+        , System.UV.DNS
+        , System.UV.Error
+        , System.UV.Handle
         , System.UV.Loop
+        , System.UV.Pipe
+        , System.UV.Pointer
+        , System.UV.Req
         , System.UV.Signal
+        , System.UV.Stream
+        , System.UV.TCP
         , System.UV.Timer
         , System.UV.Util
+
+        , System.UV.File
+        , System.UV.File.Flags
 
 sourcedir = "src"
 
