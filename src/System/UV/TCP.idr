@@ -5,7 +5,6 @@ import System.UV.Error
 import System.UV.Handle
 import System.UV.Pointer
 import System.UV.Loop
-import System.UV.Req
 import System.UV.Util
 
 %default total

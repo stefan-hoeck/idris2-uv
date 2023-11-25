@@ -12,6 +12,17 @@ import System.UV.Util
 export
 data Buf : Type where
 
+export %inline
+getString : Ptr String -> String
+getString = prim__getString
+
+export %inline
+getStringMay : Ptr String -> Maybe String
+getStringMay p =
+  case prim__nullPtr p of
+    0 => Just $ getString p
+    _ => Nothing
+
 --------------------------------------------------------------------------------
 -- FFI
 --------------------------------------------------------------------------------
@@ -20,16 +31,16 @@ data Buf : Type where
 prim__uv_set_buf_len : Ptr Buf -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_set_buf_base")
-prim__uv_set_buf_base : Ptr Buf -> Ptr Char -> PrimIO ()
+prim__uv_set_buf_base : Ptr Buf -> Ptr String -> PrimIO ()
 
 %foreign (idris_uv "uv_get_buf_len")
 prim__uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_buf_base")
-prim__uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Char)
+prim__uv_get_buf_base : Ptr Buf -> PrimIO (Ptr String)
 
 %foreign (idris_uv "uv_init_buf")
-prim__uv_init_buf : Ptr Buf -> Ptr Char -> Bits32 -> PrimIO ()
+prim__uv_init_buf : Ptr Buf -> Ptr String -> Bits32 -> PrimIO ()
 
 export %foreign (idris_uv "uv_ASYNC")
 ASYNC_SIZE : Bits32
@@ -114,6 +125,9 @@ SOCKADDR_IN6_SIZE : Bits32
 
 export %foreign (idris_uv "uv_sockaddr_size")
 SOCKADDR_SIZE : Bits32
+
+export %foreign (idris_uv "uv_addrinfo_size")
+ADDRINFO_SIZE : Bits32
 
 export %foreign (idris_uv "uv_buf_size")
 BUF_SIZE : Bits32
@@ -206,6 +220,9 @@ data GetNameInfo : Type where
 --------------------------------------------------------------------------------
 
 export
+data AddrInfo : Type where
+
+export
 data SockAddr : Type where
 
 export
@@ -245,11 +262,12 @@ data PSize : (a : Type) -> (s : Bits32) -> Type where
   WORK           : PSize Work WORK_SIZE
   GETADDRINFO    : PSize GetAddrInfo GETADDRINFO_SIZE
   GETNAMEINFO    : PSize GetNameInfo GETNAMEINFO_SIZE
+  ADDRINFO       : PSize AddrInfo ADDRINFO_SIZE
   SOCKADDR       : PSize SockAddr SOCKADDR_SIZE
   SOCKADDRIN     : PSize SockAddrIn SOCKADDR_IN_SIZE
   SOCKADDRIN6    : PSize SockAddrIn6 SOCKADDR_IN6_SIZE
   BUF            : PSize Buf BUF_SIZE
-  CHAR           : PSize Char 1
+  STRING         : PSize String 1
 
 ||| Allocates a pointer for a type of a known pointer size.
 export %inline
@@ -310,6 +328,7 @@ data PCast : Type -> Type -> Type where
   PipeStream           : PCast Pipe Stream
   TtyStream            : PCast Tty Stream
   IP4Addr              : PCast SockAddrIn SockAddr
+  RevIP4Addr           : PCast SockAddr SockAddrIn
   IP6Addr              : PCast SockAddrIn6 SockAddr
 
 export
@@ -325,7 +344,7 @@ setBufLen : HasIO io => Ptr Buf -> Bits32 -> io ()
 setBufLen p s = primIO $ prim__uv_set_buf_len p s
 
 export %inline
-setBufBase : HasIO io => Ptr Buf -> Ptr Char -> io ()
+setBufBase : HasIO io => Ptr Buf -> Ptr String -> io ()
 setBufBase p s = primIO $ prim__uv_set_buf_base p s
 
 export %inline
@@ -333,11 +352,11 @@ getBufLen : HasIO io => Ptr Buf -> io Bits32
 getBufLen p = primIO $ prim__uv_get_buf_len p
 
 export %inline
-getBufBase : HasIO io => Ptr Buf -> io (Ptr Char)
+getBufBase : HasIO io => Ptr Buf -> io (Ptr String)
 getBufBase p = primIO $ prim__uv_get_buf_base p
 
 export %inline
-initBuf : HasIO io => Ptr Buf -> Ptr Char -> Bits32 -> io ()
+initBuf : HasIO io => Ptr Buf -> Ptr String -> Bits32 -> io ()
 initBuf buf dat len = primIO $ prim__uv_init_buf buf dat len
 
 ||| Allocates a char array of the given length, wrapping it
@@ -345,7 +364,7 @@ initBuf buf dat len = primIO $ prim__uv_init_buf buf dat len
 export
 mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
 mallocBuf size = do
-  dat <- mallocPtrs Char size
+  dat <- mallocPtrs String size
   buf <- mallocPtr Buf
   initBuf buf dat size
   pure buf

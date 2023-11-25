@@ -1,6 +1,7 @@
 module Echo
 
 import System.UV
+import System.UV.DNS
 import System.UV.File
 import System.UV.Stream
 import System.UV.TCP
@@ -9,14 +10,13 @@ import System.UV.TCP
 
 allocBuf : Bits32 -> Ptr Buf -> IO ()
 allocBuf s buf = do
-  cs <- mallocPtrs Char s
+  cs <- mallocPtrs String s
   setBufBase buf cs
   setBufLen buf s
 
 echoWrite : Ptr Buf -> Ptr Write -> Int32 -> IO ()
 echoWrite buf p res = do
   when (res < 0) $ putStrLn "Write error \{fromCode res}"
-  freeBufBase buf
   freePtr p
 
 echoRead : Ptr Stream -> Int32 -> Ptr Buf -> IO ()
@@ -32,10 +32,7 @@ echoRead client nread buf = do
     Data x  => do
       putStrLn "Got some data!"
       req  <- mallocPtr Write
-      buf2 <- mallocPtr Buf 
-      base <- getBufBase buf
-      initBuf buf2 base x
-      runUVIO $ write req client buf2 1 (echoWrite buf)
+      runUVIO $ write req client buf 1 (echoWrite buf)
 
 onNewConnection : Loop => Ptr Stream -> Int32 -> IO ()
 onNewConnection server status =
@@ -49,19 +46,25 @@ onNewConnection server status =
        putStrLn "Connection accepted"
        runUVIO $ readStart client (\_ => allocBuf) echoRead
 
-printSize : HasIO io => {s : _} -> (0 p : PSize a s) -> String -> io ()
-printSize _ name = putStrLn "sizeof(\{name}) = \{show s}"
+onResolved : Loop => Ptr GetAddrInfo -> Int32 -> Ptr AddrInfo -> IO ()
+onResolved _ status res = runUVIO $ do
+  checkStatus status
+  addr <- getAddr res
+  str  <- ip4Name addr
+  putStrLn "Address resolved: \{str}"
+  server <- mallocPtr Tcp
+  tcpInit server
+  tcpBind server addr 0
+  listen server 128 onNewConnection
+  freeAddrInfo res
 
 prog : Loop => UVIO ()
 prog = do
-  server <- mallocPtr Tcp
-  addr   <- mallocPtr SockAddrIn
-
-  tcpInit server
-  ip4Addr "127.0.0.1" 6000 addr
-  tcpBind server addr 0
-  putStrLn "Listening on 127.0.0.1 on port 6000"
-  listen server 128 onNewConnection
+  hints  <- mallocPtr AddrInfo
+  res    <- mallocPtr GetAddrInfo
+  setFamily hints AF_INET
+  setSockType hints Stream
+  getAddrInfo res onResolved "localhost" "6000" hints
 
 export
 main : IO ()

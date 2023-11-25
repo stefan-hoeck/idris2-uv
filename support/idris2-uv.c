@@ -34,6 +34,25 @@ size_t uv_sockaddr_in6_size() {return sizeof(struct sockaddr_in6);}
 
 size_t uv_sockaddr_size() {return sizeof(struct sockaddr);}
 
+// `addrinfo` setters and getters
+void* uv_set_ai_family(struct addrinfo* info, int family){info->ai_family = family;}
+
+void* uv_set_ai_socktype(struct addrinfo* info, int socktype){info->ai_socktype = socktype;}
+
+void* uv_set_ai_protocol(struct addrinfo* info, int protocol){info->ai_protocol = protocol;}
+
+void* uv_set_ai_flags(struct addrinfo* info, int flags){info->ai_flags = flags;}
+
+int uv_get_ai_family(struct addrinfo* info){return info->ai_family;}
+
+int uv_get_ai_socktype(struct addrinfo* info){return info->ai_socktype;}
+
+int uv_get_ai_protocol(struct addrinfo* info){return info->ai_protocol;}
+
+int uv_get_ai_flags(struct addrinfo* info){return info->ai_flags;}
+
+struct sockaddr* uv_get_ai_addr(struct addrinfo* info){return info->ai_addr;}
+
 int uv_sigabrt() {return SIGABRT;}
 int uv_sigfpe() {return SIGFPE;}
 int uv_sighup() {return SIGHUP;}
@@ -92,5 +111,21 @@ int uv_GETADDRINFO() {return uv_req_size(UV_GETADDRINFO);}
 int uv_GETNAMEINFO() {return uv_req_size(UV_GETNAMEINFO);}
 
 int uv_buf_size() {return sizeof(uv_buf_t);}
+
+int uv_addrinfo_size() {return sizeof(struct addrinfo);}
+int uv_af_inet() {return AF_INET;}
+int uv_af_inet6() {return AF_INET6;}
+int uv_af_unix() {return AF_UNIX;}
+int uv_af_unspec() {return AF_UNSPEC;}
+int uv_sock_stream() {return SOCK_STREAM;}
+int uv_sock_dgram() {return SOCK_DGRAM;}
+int uv_sock_raw() {return SOCK_RAW;}
+int uv_sock_any() {return 0;}
+int uv_ipproto_ip() { return IPPROTO_IP; }
+int uv_ipproto_ipv6() { return IPPROTO_IPV6; }
+int uv_ipproto_icmp() { return IPPROTO_ICMP; }
+int uv_ipproto_raw() { return IPPROTO_RAW; }
+int uv_ipproto_tcp() { return IPPROTO_TCP; }
+int uv_ipproto_udp() { return IPPROTO_UDP; }
 
 int uv_EOF() {return UV_EOF;}

@@ -50,6 +50,10 @@ export
 uvRes : Int32 -> Either UVError ()
 uvRes n = if n < 0 then Left $ fromCode n else Right ()
 
+export %inline
+checkStatus : Int32 -> UVIO ()
+checkStatus = MkEitherT . pure . uvRes
+
 export
 primUV : PrimIO Int32 -> UVIO ()
 primUV io = MkEitherT $ uvRes <$> primIO io
