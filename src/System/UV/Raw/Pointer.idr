@@ -37,13 +37,13 @@ uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 
 %foreign (idris_uv "uv_init_buf")
-uv_init_buf : Ptr Buf -> Ptr Bits8 -> Bits32 -> PrimIO ()
+uv_init_buf : Bits32 -> PrimIO (Ptr Buf)
 
 %foreign (idris_uv "uv_copy_buf")
-uv_copy_to_buf : Ptr Buf -> Buffer -> Bits32 -> PrimIO ()
+uv_copy_to_buf : Ptr Bits8 -> Buffer -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_copy_buf")
-uv_copy_from_buf : Buffer -> Ptr Buf -> Bits32 -> PrimIO ()
+uv_copy_from_buf : Buffer -> Ptr Bits8 -> Bits32 -> PrimIO ()
 
 %foreign "scheme:blodwen-buffer-getstring"
 uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
@@ -377,17 +377,16 @@ getBufBase : HasIO io => Ptr Buf -> io (Ptr Bits8)
 getBufBase p = primIO $ uv_get_buf_base p
 
 export %inline
-initBuf : HasIO io => Ptr Buf -> Ptr Bits8 -> Bits32 -> io ()
-initBuf buf dat len = primIO $ uv_init_buf buf dat len
+initBuf : HasIO io => Bits32 -> io (Ptr Buf)
+initBuf len = primIO $ uv_init_buf len
 
 ||| Allocates a char array of the given length, wrapping it
 ||| in an `uv_buf_t` that's being initialized.
 export
 mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
 mallocBuf size = do
-  dat <- mallocPtrs Bits8 size
-  buf <- mallocPtr Buf
-  initBuf buf dat size
+  buf  <- initBuf size
+  blen <- getBufLen buf
   pure buf
 
 ||| Frees the memory allocated for a `uv_buf_t`'s `base` field.
@@ -407,10 +406,15 @@ freeBuf buf = freeBufBase buf >> freePtr buf
 ||| buffer.
 export
 copyToBuffer : HasIO io => Ptr Buf -> Buffer -> Bits32 -> io ()
-copyToBuffer p buf x = primIO $ uv_copy_to_buf p buf x
+copyToBuffer p buf x = do
+  pchar <- getBufBase p
+  primIO $ uv_copy_to_buf pchar buf x
 
 ||| Copy the given number of bytes an Idris-managed
 ||| buffer to a `uv_buf_t`.
 export
 copyFromBuffer : HasIO io => Buffer -> Ptr Buf -> Bits32 -> io ()
-copyFromBuffer buf p x = primIO $ uv_copy_from_buf buf p x
+copyFromBuffer buf p x = do
+  pchar <- getBufBase p
+  len   <- getBufLen p
+  primIO $ uv_copy_from_buf buf pchar x

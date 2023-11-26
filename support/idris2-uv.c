@@ -17,8 +17,8 @@ void* uv_set_buf_base(uv_buf_t* buf, char* dat){
   buf->base = dat;
 }
 
-void* uv_copy_buf(uv_buf_t* buf, char* dest, int len){
-  memcpy(dest, buf->base, len);
+void* uv_copy_buf(char * src, char * dest, int len){
+  memcpy(dest, src, len);
 }
 
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
@@ -26,8 +26,16 @@ int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
   return uv_fs_close(loop, &req, file, NULL);
 }
 
-void* uv_init_buf(uv_buf_t* buf, char *base, unsigned int len){
+int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset) {
+  uv_fs_t req;
+  return uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);
+}
+
+uv_buf_t* uv_init_buf(unsigned int len){
+  uv_buf_t * buf = malloc(sizeof(uv_buf_t));
+  char * base = malloc(len);
   *buf = uv_buf_init(base, len);
+  return buf;
 }
 
 // `addrinfo` setters and getters

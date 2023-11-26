@@ -4,15 +4,17 @@ char* uv_get_buf_base(uv_buf_t* buf);
 
 unsigned int* uv_get_buf_len(uv_buf_t* buf);
 
-void* uv_set_buf_base(uv_buf_t* buf, char* dat);
+void* uv_set_buf_base(uv_buf_t* buf, char * dat);
 
 void* uv_set_buf_len(uv_buf_t* buf, unsigned int length);
 
-void* uv_copy_buf(uv_buf_t* buf, char* dest, int len);
+void* uv_copy_buf(char * src, char * dest, int len);
 
-void* uv_init_buf(uv_buf_t* buf, char *base, unsigned int len);
+uv_buf_t* uv_init_buf(unsigned int len);
 
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
+
+int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset);
 
 int uv_EOF();
 

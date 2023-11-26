@@ -3,10 +3,7 @@ module Timer
 import System.UV
 
 run : Loop => UVIO ()
-run = do
-  ti <- mallocPtr Timer
-  timerInit ti
-  timerStart ti (\_ => putStrLn "timer fired!") 1000 0
+run = ignore $ delayed 1000 (putOutLn "timer fired")
 
 export
 main : IO ()

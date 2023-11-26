@@ -1,13 +1,13 @@
 module System.UV.Signal
 
-import Control.Monad.Either
+import Data.Fuel
 import Derive.Prelude
-import System.FFI
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Util
+import System.UV.Resource
+import public System.UV.Raw.Signal
 
 %default total
 %language ElabReflection
@@ -28,84 +28,45 @@ data SigCode : Type where
 
 %runElab derive "SigCode" [Show,Eq,Ord]
 
---------------------------------------------------------------------------------
--- FFI
---------------------------------------------------------------------------------
-
-%foreign (idris_uv "uv_signal_init")
-prim__uv_signal_init : Ptr LoopPtr -> Ptr Signal -> PrimIO Int32
-
-%foreign (idris_uv "uv_signal_start")
-prim__uv_signal_start :
-     Ptr Signal
-  -> (Ptr Signal -> Int32 -> PrimIO ())
-  -> Int32
-  -> PrimIO Int32
-
-%foreign (idris_uv "uv_signal_stop")
-prim__uv_signal_stop : Ptr Signal -> PrimIO Int32
-
-%foreign (idris_uv "uv_sigabrt")
-prim__SIGABRT : Int32
-
-%foreign (idris_uv "uv_sigfpe")
-prim__SIGFPE  : Int32
-
-%foreign (idris_uv "uv_sighup")
-prim__SIGHUP  : Int32
-
-%foreign (idris_uv "uv_sigill")
-prim__SIGILL  : Int32
-
-%foreign (idris_uv "uv_sigint")
-prim__SIGINT  : Int32
-
-%foreign (idris_uv "uv_sigquit")
-prim__SIGQUIT : Int32
-
-%foreign (idris_uv "uv_sigsegv")
-prim__SIGSEGV : Int32
-
-%foreign (idris_uv "uv_sigtrap")
-prim__SIGTRAP : Int32
-
-%foreign (idris_uv "uv_sigusr1")
-prim__SIGUSR1 : Int32
-
-%foreign (idris_uv "uv_sigusr2")
-prim__SIGUSR2 : Int32
-
---------------------------------------------------------------------------------
--- API
---------------------------------------------------------------------------------
-
 ||| Converts a `SigCode` to the corresponding C constant.
 export
 code : SigCode -> Int32
-code SIGABRT = prim__SIGABRT
-code SIGFPE  = prim__SIGFPE
-code SIGHUP  = prim__SIGHUP
-code SIGILL  = prim__SIGILL
-code SIGINT  = prim__SIGINT
-code SIGQUIT = prim__SIGQUIT
-code SIGSEGV = prim__SIGSEGV
-code SIGTRAP = prim__SIGTRAP
-code SIGUSR1 = prim__SIGUSR1
-code SIGUSR2 = prim__SIGUSR2
+code SIGABRT = uv_sigabrt
+code SIGFPE  = uv_sigfpe
+code SIGHUP  = uv_sighup
+code SIGILL  = uv_sigill
+code SIGINT  = uv_sigint
+code SIGQUIT = uv_sigquit
+code SIGSEGV = uv_sigsegv
+code SIGTRAP = uv_sigtrap
+code SIGUSR1 = uv_sigusr1
+code SIGUSR2 = uv_sigusr2
 
-export %inline
-signalInit : Loop => Ptr Signal -> UVIO ()
-signalInit @{MkLoop ptr} si = primUV (prim__uv_signal_init ptr si)
+start : Fuel -> IO Bool -> Resource -> Ptr Signal -> Int32 -> UVIO ()
 
-export %inline
-signalStart :
-     Ptr Signal
-  -> (Ptr Signal -> Int32 -> IO ())
-  -> SigCode
-  -> UVIO ()
-signalStart ptr f c =
-  primUV $ prim__uv_signal_start ptr (\p,s => toPrim $ f p s) (code c)
+go : Fuel -> IO Bool -> Resource -> Ptr Signal -> Int32 -> IO ()
 
+start f act res h c = uvio $ uv_signal_start h (go f act res) c
+
+go Dry      act res h c = release res
+go (More x) act res h c = do
+  True     <- act | False => release res
+  Right () <- runEitherT $ start x act res h c | Left _ => release res
+  pure ()
+
+||| Runs the given `IO` action each time the given signal
+||| is received until it either returns `False` or the `Fuel` runs dry.
+export
+repeatedlyOnSignal : (l : Loop) => Fuel -> SigCode -> IO Bool -> UVIO Resource
+repeatedlyOnSignal f c act = do
+  h <- mallocPtr Signal
+  uvio $ uv_signal_init l.loop h
+  res <- manageHandle h
+  start f act res h (code c)
+  pure res
+
+
+||| Runs the given `IO` action once when the given signal is received.
 export %inline
-signalStop : Ptr Signal -> UVIO ()
-signalStop ptr = primUV $ prim__uv_signal_stop ptr
+onSignal : Loop => SigCode -> IO () -> UVIO Resource
+onSignal c act = repeatedlyOnSignal (limit 1) c (act $> False)
