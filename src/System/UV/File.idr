@@ -169,6 +169,21 @@ readText path bytes cb =
 --------------------------------------------------------------------------------
 
 export
+fsWriteBytesFrom :
+     {auto has : HasIO io}
+  -> {auto l : Loop}
+  -> File
+  -> ByteString
+  -> (offset : Int64)
+  -> (onErr : UVError -> IO ())
+  -> io ()
+fsWriteBytesFrom f dat offset onErr = do
+  buf <- fromByteString dat
+  res <- uv_fs_write_sync l.loop f.file buf 1 offset
+  freeBuf buf
+  liftIO $ traverse_ onErr (toErr res)
+
+export %inline
 fsWriteBytes :
      {auto has : HasIO io}
   -> {auto l : Loop}
@@ -176,11 +191,7 @@ fsWriteBytes :
   -> ByteString
   -> (onErr : UVError -> IO ())
   -> io ()
-fsWriteBytes f dat onErr = do
-  buf <- fromByteString dat
-  res <- uv_fs_write_sync l.loop f.file buf 1 (-1)
-  freeBuf buf
-  liftIO $ traverse_ onErr (toErr res)
+fsWriteBytes f dat onErr = fsWriteBytesFrom f dat (-1) onErr
 
 export
 fsWrite :
@@ -192,7 +203,7 @@ fsWrite :
 fsWrite path dat onErr = do
   fsOpen path (WRONLY <+> CREAT) neutral $
     \case Left err => pure ()
-          Right f  => fsWriteBytes f dat onErr
+          Right f  => fsWriteBytes f dat onErr >> fsClose f
 
 export
 putOut : Loop => HasIO io => String -> io ()

@@ -37,7 +37,7 @@ uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 
 %foreign (idris_uv "uv_init_buf")
-uv_init_buf : Bits32 -> PrimIO (Ptr Buf)
+uv_init_buf : Ptr Buf -> Ptr Char -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_copy_buf")
 uv_copy_to_buf : Ptr Bits8 -> Buffer -> Bits32 -> PrimIO ()
@@ -377,16 +377,17 @@ getBufBase : HasIO io => Ptr Buf -> io (Ptr Bits8)
 getBufBase p = primIO $ uv_get_buf_base p
 
 export %inline
-initBuf : HasIO io => Bits32 -> io (Ptr Buf)
-initBuf len = primIO $ uv_init_buf len
+initBuf : HasIO io => Ptr Buf -> Ptr Char -> Bits32 -> io ()
+initBuf pbuf pcs len = primIO $ uv_init_buf pbuf pcs len
 
 ||| Allocates a char array of the given length, wrapping it
 ||| in an `uv_buf_t` that's being initialized.
 export
 mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
 mallocBuf size = do
-  buf  <- initBuf size
-  blen <- getBufLen buf
+  buf <- mallocPtr Buf
+  cs  <- mallocPtrs Char size
+  initBuf buf cs size
   pure buf
 
 ||| Frees the memory allocated for a `uv_buf_t`'s `base` field.
@@ -416,5 +417,4 @@ export
 copyFromBuffer : HasIO io => Buffer -> Ptr Buf -> Bits32 -> io ()
 copyFromBuffer buf p x = do
   pchar <- getBufBase p
-  len   <- getBufLen p
   primIO $ uv_copy_from_buf buf pchar x

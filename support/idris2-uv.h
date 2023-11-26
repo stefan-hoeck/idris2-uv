@@ -10,7 +10,7 @@ void* uv_set_buf_len(uv_buf_t* buf, unsigned int length);
 
 void* uv_copy_buf(char * src, char * dest, int len);
 
-uv_buf_t* uv_init_buf(unsigned int len);
+void* uv_init_buf(uv_buf_t * buf, char * base, unsigned int len);
 
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
 

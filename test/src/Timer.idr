@@ -3,7 +3,7 @@ module Timer
 import System.UV
 
 run : Loop => UVIO ()
-run = ignore $ delayed 1000 (putOutLn "timer fired")
+run = ignore $ delayed 1000 (runUVIO $ putOutLn "timer fired")
 
 export
 main : IO ()

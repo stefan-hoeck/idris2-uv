@@ -44,7 +44,7 @@ prim__uv_fs_write :
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int32)
+  -> (offset : Int64)
   -> (cb     : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
@@ -54,7 +54,7 @@ prim__uv_fs_write_sync :
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int32)
+  -> (offset : Int64)
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_close")
@@ -138,7 +138,7 @@ parameters {auto has : HasIO io}
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
     -> (nbufs  : Bits32)
-    -> (offset : Int32)
+    -> (offset : Int64)
     -> (cb     : Ptr Fs -> IO ())
     -> io Int32
   uv_fs_write l f h bufs nbufs offset act =
@@ -153,7 +153,7 @@ parameters {auto has : HasIO io}
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
     -> (nbufs  : Bits32)
-    -> (offset : Int32)
+    -> (offset : Int64)
     -> io Int32
   uv_fs_write_sync l h bufs nbufs offset =
     primIO $ prim__uv_fs_write_sync l h bufs nbufs offset
