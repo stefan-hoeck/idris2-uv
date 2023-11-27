@@ -99,8 +99,9 @@ size_t uv_work_sz();
 size_t uv_getaddrinfo_sz();
 size_t uv_getnameinfo_sz();
 
-// Size of uv_buf struct
+// Size of uv_buf and loop struct
 size_t uv_buf_sz();
+size_t uv_loop_sz();
 
 // addrinfo constants
 size_t uv_addrinfo_sz();

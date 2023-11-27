@@ -19,7 +19,7 @@ prim__uv_fs_req_cleanup : Ptr Fs -> PrimIO ()
 
 %foreign (idris_uv "uv_fs_open")
 prim__uv_fs_open :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr Fs
   -> String
   -> (flags,mode : Bits32)
@@ -28,7 +28,7 @@ prim__uv_fs_open :
 
 %foreign (idris_uv "uv_fs_read")
 prim__uv_fs_read :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
@@ -39,7 +39,7 @@ prim__uv_fs_read :
 
 %foreign (idris_uv "uv_fs_write")
 prim__uv_fs_write :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
@@ -50,7 +50,7 @@ prim__uv_fs_write :
 
 %foreign (idris_uv "uv_fs_write_sync")
 prim__uv_fs_write_sync :
-     Ptr LoopPtr
+     Ptr Loop
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
@@ -59,14 +59,14 @@ prim__uv_fs_write_sync :
 
 %foreign (idris_uv "uv_fs_close")
 prim__uv_fs_close :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr Fs
   -> (file : Int32)
   -> (cb   : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_close_sync")
-prim__uv_fs_close_sync : Ptr LoopPtr -> (file : Int32) -> PrimIO Int32
+prim__uv_fs_close_sync : Ptr Loop -> (file : Int32) -> PrimIO Int32
 
 --------------------------------------------------------------------------------
 -- API
@@ -86,20 +86,20 @@ parameters {auto has : HasIO io}
   ||| instead for simplicity.
   ||| Closing a file will probably not have a significant blocking effect.
   export %inline
-  uv_fs_close : Ptr LoopPtr -> Ptr Fs -> Int32 -> (Ptr Fs -> IO ()) -> io Int32
+  uv_fs_close : Ptr Loop -> Ptr Fs -> Int32 -> (Ptr Fs -> IO ()) -> io Int32
   uv_fs_close l fs h run = do
     primIO $ prim__uv_fs_close l fs h (\p => toPrim $ run p)
 
   ||| Synchronously closes a file and releases the file handle.
   export %inline
-  uv_fs_close_sync : Ptr LoopPtr -> Int32 -> io Int32
+  uv_fs_close_sync : Ptr Loop -> Int32 -> io Int32
   uv_fs_close_sync l h = primIO $ prim__uv_fs_close_sync l h
 
   ||| Asynchronously opens a file, invoking the given callback once
   ||| the file is ready.
   export %inline
   uv_fs_open :
-       Ptr LoopPtr
+       Ptr Loop
     -> Ptr Fs
     -> String
     -> (flags : Bits32)
@@ -118,7 +118,7 @@ parameters {auto has : HasIO io}
   ||| version.
   export %inline
   uv_fs_read :
-       Ptr LoopPtr
+       Ptr Loop
     -> Ptr Fs
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
@@ -133,7 +133,7 @@ parameters {auto has : HasIO io}
   ||| the callback function once the data is ready.
   export %inline
   uv_fs_write :
-       Ptr LoopPtr
+       Ptr Loop
     -> Ptr Fs
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
@@ -149,7 +149,7 @@ parameters {auto has : HasIO io}
   ||| the callback function once the data is ready.
   export %inline
   uv_fs_write_sync :
-       Ptr LoopPtr
+       Ptr Loop
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
     -> (nbufs  : Bits32)

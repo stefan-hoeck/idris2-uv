@@ -9,11 +9,14 @@ import public System.FFI
 %default total
 
 --------------------------------------------------------------------------------
--- Buffers
+-- Buffers and Loops
 --------------------------------------------------------------------------------
 
 export
 data Buf : Type where
+
+export
+data Loop : Type where
 
 --------------------------------------------------------------------------------
 -- FFI
@@ -47,6 +50,9 @@ uv_copy_from_buf : Buffer -> Ptr Bits8 -> Bits32 -> PrimIO ()
 
 %foreign "scheme:blodwen-buffer-getstring"
 uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
+
+export %foreign (idris_uv "uv_loop_sz")
+uv_loop_sz : Bits32
 
 export %foreign (idris_uv "uv_async_sz")
 uv_async_sz : Bits32
@@ -276,6 +282,7 @@ data PSize : (a : Type) -> (s : Bits32) -> Type where
   SOCKADDRIN     : PSize SockAddrIn Pointer.uv_sockaddr_in_sz
   SOCKADDRIN6    : PSize SockAddrIn6 Pointer.uv_sockaddr_in6_sz
   BUF            : PSize Buf Pointer.uv_buf_sz
+  LOOP           : PSize Loop Pointer.uv_loop_sz
   BYTE           : PSize Bits8 1
   CHAR           : PSize Char 1
 

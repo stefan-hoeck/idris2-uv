@@ -85,7 +85,7 @@ uv_ipproto_udp : Int32
 
 %foreign (idris_uv "uv_getaddrinfo")
 prim__uv_getaddrinfo :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr GetAddrInfo
   -> (Ptr GetAddrInfo -> Int32 -> Ptr AddrInfo -> PrimIO ())
   -> (node, service : String)
@@ -94,7 +94,7 @@ prim__uv_getaddrinfo :
 
 %foreign (idris_uv "uv_getnameinfo")
 prim__uv_getnameinfo :
-     Ptr LoopPtr
+     Ptr Loop
   -> Ptr GetNameInfo
   -> (Ptr GetAddrInfo -> Int32 -> (hostname, servie : Ptr Char) -> PrimIO ())
   -> Ptr SockAddr
@@ -149,7 +149,7 @@ parameters {auto has : HasIO io}
 
   export %inline
   uv_getaddrinfo :
-       Ptr LoopPtr
+       Ptr Loop
     -> Ptr GetAddrInfo
     -> (Ptr GetAddrInfo -> Int32 -> Ptr AddrInfo -> IO ())
     -> (node, service : String)
@@ -160,7 +160,7 @@ parameters {auto has : HasIO io}
 
   export %inline
   uv_getnameinfo :
-       Ptr LoopPtr
+       Ptr Loop
     -> Ptr GetNameInfo
     -> (Ptr GetAddrInfo -> Int32 -> (hostname, service : Ptr Char) -> IO ())
     -> Ptr SockAddr

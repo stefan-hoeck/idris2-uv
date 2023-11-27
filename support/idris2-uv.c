@@ -115,6 +115,7 @@ size_t uv_getaddrinfo_sz() {return uv_req_size(UV_GETADDRINFO);}
 size_t uv_getnameinfo_sz() {return uv_req_size(UV_GETNAMEINFO);}
 
 size_t uv_buf_sz() {return sizeof(uv_buf_t);}
+size_t uv_loop_sz() {return sizeof(uv_loop_t);}
 size_t uv_sockaddr_in_sz() {return sizeof(struct sockaddr_in);}
 size_t uv_sockaddr_in6_sz() {return sizeof(struct sockaddr_in6);}
 size_t uv_sockaddr_sz() {return sizeof(struct sockaddr);}

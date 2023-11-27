@@ -48,7 +48,7 @@ withFile act p = do
 ||| the file is ready.
 export %inline
 fsOpen :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> String
   -> Flags
   -> Mode
@@ -59,7 +59,7 @@ fsOpen path f m act = do
   uvio $ uv_fs_open l.loop fs path f.flags m.mode (withFile act)
 
 export %inline
-fsClose : HasIO io => (l : Loop) => File -> io ()
+fsClose : HasIO io => (l : UVLoop) => File -> io ()
 fsClose f = ignore $ uv_fs_close_sync l.loop f.file
 
 --------------------------------------------------------------------------------
@@ -122,7 +122,7 @@ readAndReleaseRes buf fs = do
 ||| Asynchronously reads up to the given number of bytes from the given file.
 export
 fsReadBytes :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (file   : File)
   -> (bytes  : Bits32)
   -> (cb     : ReadRes ByteString -> IO ())
@@ -140,7 +140,7 @@ fsReadBytes f bytes cb = do
 ||| asynchronously read up to the given number of bytes.
 export
 readBytes :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (path   : String)
   -> (bytes  : Bits32)
   -> (cb     : ReadRes ByteString -> IO ())
@@ -156,7 +156,7 @@ readBytes path bytes cb =
 ||| The data read is interpreted as a UTF8-encoded string.
 export %inline
 readText :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (path   : String)
   -> (bytes  : Bits32)
   -> (cb     : ReadRes String -> IO ())
@@ -171,7 +171,7 @@ readText path bytes cb =
 export
 fsWriteBytesFrom :
      {auto has : HasIO io}
-  -> {auto l : Loop}
+  -> {auto l : UVLoop}
   -> File
   -> ByteString
   -> (offset : Int64)
@@ -186,7 +186,7 @@ fsWriteBytesFrom f dat offset onErr = do
 export %inline
 fsWriteBytes :
      {auto has : HasIO io}
-  -> {auto l : Loop}
+  -> {auto l : UVLoop}
   -> File
   -> ByteString
   -> (onErr : UVError -> IO ())
@@ -195,7 +195,7 @@ fsWriteBytes f dat onErr = fsWriteBytesFrom f dat (-1) onErr
 
 export
 fsWrite :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (path : String)
   -> ByteString
   -> (onErr : UVError -> IO ())
@@ -206,33 +206,33 @@ fsWrite path dat onErr = do
           Right f  => fsWriteBytes f dat onErr >> fsClose f
 
 export
-putOut : Loop => HasIO io => String -> io ()
+putOut : UVLoop => HasIO io => String -> io ()
 putOut s = fsWriteBytes stdout (fromString s) (const $ pure ())
 
 export %inline
-putOutLn : Loop => HasIO io => String -> io ()
+putOutLn : UVLoop => HasIO io => String -> io ()
 putOutLn s = putOut (s ++ "\n")
 
 export %inline
-printOut : Loop => HasIO io => Show a => a -> io ()
+printOut : UVLoop => HasIO io => Show a => a -> io ()
 printOut = putOut . show
 
 export %inline
-printOutLn : Loop => HasIO io => String -> io ()
+printOutLn : UVLoop => HasIO io => String -> io ()
 printOutLn = putOutLn . show
 
 export
-putErr : Loop => HasIO io => String -> io ()
+putErr : UVLoop => HasIO io => String -> io ()
 putErr s = fsWriteBytes stderr (fromString s) (const $ pure ())
 
 export %inline
-putErrLn : Loop => HasIO io => String -> io ()
+putErrLn : UVLoop => HasIO io => String -> io ()
 putErrLn s = putErr (s ++ "\n")
 
 export %inline
-printErr : Loop => HasIO io => Show a => a -> io ()
+printErr : UVLoop => HasIO io => Show a => a -> io ()
 printErr = putErr . show
 
 export %inline
-printErrLn : Loop => HasIO io => String -> io ()
+printErrLn : UVLoop => HasIO io => String -> io ()
 printErrLn = putErrLn . show

@@ -12,7 +12,7 @@ import System.UV.Raw.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_pipe_init")
-prim__uv_pipe_init : Ptr LoopPtr -> Ptr Pipe -> (ipc : Int32) -> PrimIO Int32
+prim__uv_pipe_init : Ptr Loop -> Ptr Pipe -> (ipc : Int32) -> PrimIO Int32
 
 %foreign (idris_uv "uv_pipe_open")
 prim__uv_pipe_open : Ptr Pipe -> (file : Int32) -> PrimIO Int32
@@ -46,7 +46,7 @@ parameters {auto has : HasIO io}
   ||| be passing the handles should have this flag set, not the listening
   ||| pipe that uv_accept is called on.
   export %inline
-  uv_pipe_init : Ptr LoopPtr -> Ptr Pipe -> (ipc : Bool) -> io Int32
+  uv_pipe_init : Ptr Loop -> Ptr Pipe -> (ipc : Bool) -> io Int32
   uv_pipe_init l p ipc = primIO $ prim__uv_pipe_init l p (boolToInt32 ipc)
 
   ||| Open an existing file descriptor or HANDLE as a pipe.

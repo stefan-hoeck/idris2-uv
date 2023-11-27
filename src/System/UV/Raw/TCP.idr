@@ -12,7 +12,7 @@ import System.UV.Raw.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_tcp_init")
-prim__uv_tcp_init : Ptr LoopPtr -> Ptr Tcp -> PrimIO Int32
+prim__uv_tcp_init : Ptr Loop -> Ptr Tcp -> PrimIO Int32
 
 %foreign (idris_uv "uv_tcp_keepalive")
 prim__uv_tcp_keepalive : Ptr Tcp -> Int32 -> Bits32 -> PrimIO Int32
@@ -60,7 +60,7 @@ parameters {auto has : HasIO io}
 
   ||| Initialize the handle. No socket is created as of yet.
   export %inline
-  uv_tcp_init : Ptr LoopPtr -> Ptr Tcp -> io Int32
+  uv_tcp_init : Ptr Loop -> Ptr Tcp -> io Int32
   uv_tcp_init l p = primIO $ prim__uv_tcp_init l p
 
   ||| Enable / disable TCP keep-alive. delay is the initial
