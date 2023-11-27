@@ -1,6 +1,6 @@
 module System.UV.Error
 
-import Control.Monad.Either
+import public Control.Monad.Either
 import Derive.Prelude
 import System.UV.Util
 
@@ -51,8 +51,16 @@ uvRes : Int32 -> Either UVError ()
 uvRes n = if n < 0 then Left $ fromCode n else Right ()
 
 export %inline
+toErr : Int32 -> Maybe UVError
+toErr = either Just (const Nothing) . uvRes
+
+export %inline
 checkStatus : Int32 -> UVIO ()
 checkStatus = MkEitherT . pure . uvRes
+
+export %inline
+uvio : IO Int32 -> UVIO ()
+uvio io = MkEitherT $ uvRes <$> io
 
 export
 primUV : PrimIO Int32 -> UVIO ()

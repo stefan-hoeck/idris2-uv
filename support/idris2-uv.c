@@ -17,8 +17,8 @@ void* uv_set_buf_base(uv_buf_t* buf, char* dat){
   buf->base = dat;
 }
 
-void* uv_copy_buf(uv_buf_t* buf, char* dest, int len){
-  memcpy(dest, buf->base, len);
+void* uv_copy_buf(char * src, char * dest, int len){
+  memcpy(dest, src, len);
 }
 
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
@@ -26,15 +26,17 @@ int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
   return uv_fs_close(loop, &req, file, NULL);
 }
 
-void* uv_init_buf(uv_buf_t* buf, char *base, unsigned int len){
-  *buf = uv_buf_init(base, len);
+int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset) {
+  uv_fs_t req;
+  int res = uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);
+  uv_fs_req_cleanup(&req);
+  return res;
 }
 
-size_t uv_sockaddr_in_size() {return sizeof(struct sockaddr_in);}
-
-size_t uv_sockaddr_in6_size() {return sizeof(struct sockaddr_in6);}
-
-size_t uv_sockaddr_size() {return sizeof(struct sockaddr);}
+void* uv_init_buf(uv_buf_t * buf, char * base, unsigned int len){
+  *buf = uv_buf_init(base, len);
+  return buf;
+}
 
 // `addrinfo` setters and getters
 void* uv_set_ai_family(struct addrinfo* info, int family){info->ai_family = family;}
@@ -72,49 +74,52 @@ int uv_rdwr()   {return O_RDWR;}
 int uv_append() {return O_APPEND;}
 int uv_creat()  {return O_CREAT;}
 
-int uv_S_IRWXU() {return S_IRWXU;}
-int uv_S_IRUSR() {return S_IRUSR;}
-int uv_S_IWUSR() {return S_IWUSR;}
-int uv_S_IXUSR() {return S_IXUSR;}
-int uv_S_IRWXG() {return S_IRWXG;}
-int uv_S_IRGRP() {return S_IRGRP;}
-int uv_S_IWGRP() {return S_IWGRP;}
-int uv_S_IXGRP() {return S_IXGRP;}
-int uv_S_IRWXO() {return S_IRWXO;}
-int uv_S_IROTH() {return S_IROTH;}
-int uv_S_IWOTH() {return S_IWOTH;}
-int uv_S_IXOTH() {return S_IXOTH;}
+int uv_s_irwxu() {return S_IRWXU;}
+int uv_s_irusr() {return S_IRUSR;}
+int uv_s_iwusr() {return S_IWUSR;}
+int uv_s_ixusr() {return S_IXUSR;}
+int uv_s_irwxg() {return S_IRWXG;}
+int uv_s_irgrp() {return S_IRGRP;}
+int uv_s_iwgrp() {return S_IWGRP;}
+int uv_s_ixgrp() {return S_IXGRP;}
+int uv_s_irwxo() {return S_IRWXO;}
+int uv_s_iroth() {return S_IROTH;}
+int uv_s_iwoth() {return S_IWOTH;}
+int uv_s_ixoth() {return S_IXOTH;}
 
-int uv_ASYNC() {return uv_handle_size(UV_ASYNC);}
-int uv_CHECK() {return uv_handle_size(UV_CHECK);}
-int uv_FS_EVENT() {return uv_handle_size(UV_FS_EVENT);}
-int uv_FS_POLL() {return uv_handle_size(UV_FS_POLL);}
-int uv_HANDLE() {return uv_handle_size(UV_HANDLE);}
-int uv_IDLE() {return uv_handle_size(UV_IDLE);}
-int uv_NAMED_PIPE() {return uv_handle_size(UV_NAMED_PIPE);}
-int uv_POLL() {return uv_handle_size(UV_POLL);}
-int uv_PREPARE() {return uv_handle_size(UV_PREPARE);}
-int uv_PROCESS() {return uv_handle_size(UV_PROCESS);}
-int uv_STREAM() {return uv_handle_size(UV_STREAM);}
-int uv_TCP() {return uv_handle_size(UV_TCP);}
-int uv_TIMER() {return uv_handle_size(UV_TIMER);}
-int uv_TTY() {return uv_handle_size(UV_TTY);}
-int uv_UDP() {return uv_handle_size(UV_UDP);}
-int uv_SIGNAL() {return uv_handle_size(UV_SIGNAL);}
+size_t uv_async_sz() {return uv_handle_size(UV_ASYNC);}
+size_t uv_check_sz() {return uv_handle_size(UV_CHECK);}
+size_t uv_fs_event_sz() {return uv_handle_size(UV_FS_EVENT);}
+size_t uv_fs_poll_sz() {return uv_handle_size(UV_FS_POLL);}
+size_t uv_handle_sz() {return uv_handle_size(UV_HANDLE);}
+size_t uv_idle_sz() {return uv_handle_size(UV_IDLE);}
+size_t uv_named_pipe_sz() {return uv_handle_size(UV_NAMED_PIPE);}
+size_t uv_poll_sz() {return uv_handle_size(UV_POLL);}
+size_t uv_prepare_sz() {return uv_handle_size(UV_PREPARE);}
+size_t uv_process_sz() {return uv_handle_size(UV_PROCESS);}
+size_t uv_stream_sz() {return uv_handle_size(UV_STREAM);}
+size_t uv_tcp_sz() {return uv_handle_size(UV_TCP);}
+size_t uv_timer_sz() {return uv_handle_size(UV_TIMER);}
+size_t uv_tty_sz() {return uv_handle_size(UV_TTY);}
+size_t uv_udp_sz() {return uv_handle_size(UV_UDP);}
+size_t uv_signal_sz() {return uv_handle_size(UV_SIGNAL);}
 
-int uv_REQ() {return uv_req_size(UV_REQ);}
-int uv_CONNECT() {return uv_req_size(UV_CONNECT);}
-int uv_WRITE() {return uv_req_size(UV_WRITE);}
-int uv_SHUTDOWN() {return uv_req_size(UV_SHUTDOWN);}
-int uv_UDP_SEND() {return uv_req_size(UV_UDP_SEND);}
-int uv_FS() {return uv_req_size(UV_FS);}
-int uv_WORK() {return uv_req_size(UV_WORK);}
-int uv_GETADDRINFO() {return uv_req_size(UV_GETADDRINFO);}
-int uv_GETNAMEINFO() {return uv_req_size(UV_GETNAMEINFO);}
+size_t uv_req_sz() {return uv_req_size(UV_REQ);}
+size_t uv_connect_sz() {return uv_req_size(UV_CONNECT);}
+size_t uv_write_sz() {return uv_req_size(UV_WRITE);}
+size_t uv_shutdown_sz() {return uv_req_size(UV_SHUTDOWN);}
+size_t uv_udp_send_sz() {return uv_req_size(UV_UDP_SEND);}
+size_t uv_fs_sz() {return uv_req_size(UV_FS);}
+size_t uv_work_sz() {return uv_req_size(UV_WORK);}
+size_t uv_getaddrinfo_sz() {return uv_req_size(UV_GETADDRINFO);}
+size_t uv_getnameinfo_sz() {return uv_req_size(UV_GETNAMEINFO);}
 
-int uv_buf_size() {return sizeof(uv_buf_t);}
+size_t uv_buf_sz() {return sizeof(uv_buf_t);}
+size_t uv_sockaddr_in_sz() {return sizeof(struct sockaddr_in);}
+size_t uv_sockaddr_in6_sz() {return sizeof(struct sockaddr_in6);}
+size_t uv_sockaddr_sz() {return sizeof(struct sockaddr);}
+size_t uv_addrinfo_sz() {return sizeof(struct addrinfo);}
 
-int uv_addrinfo_size() {return sizeof(struct addrinfo);}
 int uv_af_inet() {return AF_INET;}
 int uv_af_inet6() {return AF_INET6;}
 int uv_af_unix() {return AF_UNIX;}

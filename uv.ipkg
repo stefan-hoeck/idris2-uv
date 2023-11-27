@@ -15,6 +15,7 @@ modules = System.UV
         , System.UV.Pipe
         , System.UV.Pointer
         , System.UV.Req
+        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP
@@ -23,6 +24,17 @@ modules = System.UV
 
         , System.UV.File
         , System.UV.File.Flags
+
+        , System.UV.Raw.File
+        , System.UV.Raw.Handle
+        , System.UV.Raw.Loop
+        , System.UV.Raw.Pipe
+        , System.UV.Raw.Pointer
+        , System.UV.Raw.Signal
+        , System.UV.Raw.Stream
+        , System.UV.Raw.TCP
+        , System.UV.Raw.Timer
+        , System.UV.Raw.Util
 
 sourcedir = "src"
 

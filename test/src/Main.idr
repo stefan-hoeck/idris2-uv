@@ -1,10 +1,12 @@
 module Main
 
-import System.UV
+import Flags
+import Hedgehog
+import Pointer
 import Timer
-import FileIO
-import Echo
-
 
 main : IO ()
-main = Echo.main
+main = do
+  Timer.main
+  -- Pointer.run
+  -- test [ Flags.props ]

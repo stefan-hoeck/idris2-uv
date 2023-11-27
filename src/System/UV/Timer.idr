@@ -1,64 +1,51 @@
+||| This module provides functions for running computations
+||| once or more at discrete time intervals.
+|||
+||| This provides a layer of abstraction and security on top
+||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
-import Control.Monad.Either
-import System.FFI
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Util
+import System.UV.Resource
+import public System.UV.Raw.Timer
 
 %default total
 
---------------------------------------------------------------------------------
--- FFI
---------------------------------------------------------------------------------
-
-%foreign (idris_uv "uv_timer_init")
-prim__uv_timer_init : Ptr LoopPtr -> Ptr Timer -> PrimIO Int32
-
-%foreign (idris_uv "uv_timer_start")
-prim__uv_timer_start :
-     Ptr Timer
-  -> (Ptr Timer -> PrimIO ())
-  -> Bits64
-  -> Bits64
-  -> PrimIO Int32
-
-%foreign (idris_uv "uv_timer_stop")
-prim__uv_timer_stop : Ptr Timer -> PrimIO Int32
-
-%foreign (idris_uv "uv_timer_set_repeat")
-prim__uv_timer_set_repeat : Ptr Timer -> Bits64 -> PrimIO ()
-
-%foreign (idris_uv "uv_timer_again")
-prim__uv_timer_again : Ptr Timer -> PrimIO Int32
-
---------------------------------------------------------------------------------
--- API
---------------------------------------------------------------------------------
-
-export %inline
-timerInit : Loop => Ptr Timer -> UVIO ()
-timerInit @{MkLoop ptr} ti = primUV (prim__uv_timer_init ptr ti)
-
-export %inline
-timerStart :
-     Ptr Timer
-  -> (Ptr Timer -> IO ())
+||| Invokes the given IO action every `repeat` milliseconds, the first time
+||| after `timeout` has passed.
+|||
+||| Execution can be stopped whenever the returned `Resource` is released.
+||| The release handle is also passed to the callback, so that execution can
+||| be stopped from there as well.
+export
+timer :
+     {auto l : Loop}
   -> (timeout,repeat : Bits64)
-  -> UVIO ()
-timerStart ptr f t r =
-  primUV $ prim__uv_timer_start ptr (\p => toPrim $ f p) t r
+  -> (Resource -> IO ())
+  -> UVIO Resource 
+timer t r act = do
+  h   <- mallocPtr Timer
+  uvio $ uv_timer_init l.loop h
+  res <- manageHandle h
+  uvio $ uv_timer_start h (\_ => act res) t r
+  pure res
 
+||| Invokes the given IO action every `repeat` milliseconds, the first time
+||| after `timeout` has passed.
+|||
+||| Execution can be stopped whenever the returned `Resource` is released.
 export %inline
-timerStop : Ptr Timer -> UVIO ()
-timerStop ptr = primUV $ prim__uv_timer_stop ptr
+repeatedly : (l : Loop) => (timeout,repeat : Bits64) -> IO () -> UVIO Resource 
+repeatedly t r = timer t r . const
 
+||| Invokes the given IO action after `timeout` milliseconds.
+|||
+||| Execution can be aborted whenever the returned `Resource` is released.
+||| Note: All resources are freed automatically
+|||       after the IO action has been resolved.
 export %inline
-timerAgain : Ptr Timer -> UVIO ()
-timerAgain ptr = primUV $ prim__uv_timer_again ptr
-
-export %inline
-timerSetRepeat : HasIO io => Ptr Timer -> Bits64 -> io ()
-timerSetRepeat ptr repeat = primIO $ prim__uv_timer_set_repeat ptr repeat
+delayed : (l : Loop) => (timeout : Bits64) -> IO () -> UVIO Resource 
+delayed t act = timer t 0 (\res => act >> release res)
