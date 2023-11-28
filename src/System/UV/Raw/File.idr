@@ -26,6 +26,14 @@ prim__uv_fs_open :
   -> (cb : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
+%foreign (idris_uv "uv_fs_open_sync")
+prim__uv_fs_open_sync :
+     Ptr Loop
+  -> Ptr Fs
+  -> String
+  -> (flags,mode : Bits32)
+  -> PrimIO Int32
+
 %foreign (idris_uv "uv_fs_read")
 prim__uv_fs_read :
      Ptr Loop
@@ -106,8 +114,21 @@ parameters {auto has : HasIO io}
     -> (mode  : Bits32)
     -> (Ptr Fs -> IO ())
     -> io Int32
-  uv_fs_open l ptr path fs m act = do
+  uv_fs_open l ptr path fs m act =
     primIO $ prim__uv_fs_open l ptr path fs m $ \p => toPrim (act p)
+
+  ||| Synchronously opens a file, invoking the given callback once
+  ||| the file is ready.
+  export %inline
+  uv_fs_open_sync :
+       Ptr Loop
+    -> Ptr Fs
+    -> String
+    -> (flags : Bits32)
+    -> (mode  : Bits32)
+    -> io Int32
+  uv_fs_open_sync l ptr path fs m =
+    primIO $ prim__uv_fs_open_sync l ptr path fs m
 
   ||| Reads data from a file into the given buffer and invokes
   ||| the callback function once the data is ready.

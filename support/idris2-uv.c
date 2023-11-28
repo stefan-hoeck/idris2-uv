@@ -26,6 +26,12 @@ int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
   return uv_fs_close(loop, &req, file, NULL);
 }
 
+int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags, int mode) {
+  return uv_fs_open(loop, req, path, flags, mode, NULL);
+}
+
+void * uv_close_sync(uv_handle_t *handle){ uv_close(handle, NULL); }
+
 int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset) {
   uv_fs_t req;
   int res = uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);

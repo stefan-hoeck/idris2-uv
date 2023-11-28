@@ -131,7 +131,7 @@ fsReadBytes :
 fsReadBytes f bytes cb = do
   fr  <- mallocPtr Fs
   buf <- mallocBuf bytes
-  res <- uv_fs_read l.loop fr f.file buf 1 (-1) $ \fr =>
+  res <- uv_fs_read l.loop fr f.file buf 1 0 $ \fr =>
     readAndReleaseRes buf fr >>= cb
   case uvRes res of
     Left err => freeBuf buf >> releaseFs fr >> cb (Err err)

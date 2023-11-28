@@ -37,7 +37,9 @@ import System.UV
 import System.UV.File
 import System.UV.Raw.Idle
 import System.UV.Raw.Loop
+import System.UV.Raw.Pipe
 import System.UV.Raw.Signal
+import System.UV.Raw.Stream
 
 %default total
 
@@ -316,23 +318,29 @@ send `NULL` in place of a callback function across the FFI.
 
 ### Observing Asynchronisity
 
-It is quite illuminating to add an `uv_idle_t` handle on top of
+It is quite illuminating to add an *idle* handle on top of
 our file reading application. In the following version, we print
-a short message on every iteration of the event loop:
+a short message on every iteration of the event loop. We make sure
+the event loop stops when we are done with reading and writing
+data by un-referencing the idler.
 
 ```idris
+countIterations : IORef Nat -> IO ()
+countIterations ref = do
+  modifyIORef ref S
+  v <- readIORef ref
+  putStrLn "I'm at iteration \{show v} now."
+
 fileExample2 : IO ()
 fileExample2 = do
   (_::p::_) <- getArgs | _ => die "Invalid number of arguments"
   loop  <- uv_default_loop
   
   -- Setting up the idler
+  ref   <- newIORef Z
   idler <- mallocPtr Idle
   _     <- uv_idle_init loop idler
-  _     <- uv_idle_start idler (\_ => putStrLn "I'm waiiiting...")
-
-  -- make sure the loop stops once reading is done by un-referencing
-  -- the idler
+  _     <- uv_idle_start idler (\_ => countIterations ref)
   _     <- uv_unref idler
 
   _     <- catFile loop p
@@ -340,8 +348,8 @@ fileExample2 = do
   _     <- uv_loop_close loop
   freePtr idler
 
-main : IO ()
-main = fileExample2
+-- main : IO ()
+-- main = fileExample2
 ```
 
 Running this will show you how many iterations of the event loop
@@ -350,6 +358,53 @@ On my machine, terminal output took the longest, so it's definitely
 something we should consider to be doing asynchronously to keep
 our application responsive.
 
+### Streaming Standard Input
+
+Below is a simple example of streaming data from a pipe (standard
+input in this case, which has file handle zero): We read data from
+standard input and echo it back to standard output.
+
+For reasons of efficiency, we allocate a single buffer that we
+keep reusing. This is incredibly efficient. For instance,
+when piping the output of `cat` on a lengthy file into the
+compiled program and redirecting standard output to a file
+on disk, I can copy 2 GB of data in about 1.5 seconds on my
+machine.
+
+```idris
+BufSize : Bits32
+BufSize = 0xffff
+
+allocBuf : Ptr Char -> Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
+allocBuf cs _ _ buf = initBuf buf cs BufSize
+
+onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
+onStreamRead loop stream res buf = do
+  if res < 0
+     then when (res /= UV_EOF) (putStrLn "Error: \{uv_strerror res}")
+     else setBufLen buf (cast res) >>
+          ignore (uv_fs_write_sync loop 1 buf 1 (-1))
+
+streamExample : IO ()
+streamExample = do
+  loop <- uv_default_loop
+  
+  pipe <- mallocPtr Pipe
+  _    <- uv_pipe_init loop pipe False
+  r    <- uv_pipe_open pipe 0
+  cs   <- mallocPtrs Char BufSize
+  _    <- uv_read_start pipe (allocBuf cs) (onStreamRead loop)
+  _    <- uv_run loop UV_RUN_DEFAULT
+  ignore $ uv_loop_close loop
+
+main : IO ()
+main = streamExample
+```
+
+Two new concepts appear in the code example above: Initialization of pipes
+with `uv_pipe_open` and checking for the end of input by comparing
+the reading result with `UV_EOF`. All other concepts have already been
+explained before.
+
 <!-- vi: filetype=idris2:syntax=markdown
 -->
-
