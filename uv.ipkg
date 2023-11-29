@@ -31,6 +31,7 @@ modules = System.UV
         , System.UV.Raw.Loop
         , System.UV.Raw.Pipe
         , System.UV.Raw.Pointer
+        , System.UV.Raw.Req
         , System.UV.Raw.Signal
         , System.UV.Raw.Stream
         , System.UV.Raw.TCP

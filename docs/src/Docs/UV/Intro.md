@@ -38,6 +38,7 @@ import System.UV.File
 import System.UV.Raw.Idle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pipe
+import System.UV.Raw.TCP
 import System.UV.Raw.Signal
 import System.UV.Raw.Stream
 
@@ -151,7 +152,7 @@ the app:
 ```idris
 stop : Ptr Idle -> Ptr Signal -> Int32 -> IO ()
 stop idl _ sig = do
-  putStrLn "Application interrupte by signal \{show sig} (SIGINT)."
+  putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
   ignore $ uv_idle_stop idl
   putStrLn "Goodbye."
 
@@ -375,7 +376,7 @@ machine.
 BufSize : Bits32
 BufSize = 0xffff
 
-allocBuf : Ptr Char -> Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
+allocBuf : Ptr Bits8 -> Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
 allocBuf cs _ _ buf = initBuf buf cs BufSize
 
 onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
@@ -392,19 +393,155 @@ streamExample = do
   pipe <- mallocPtr Pipe
   _    <- uv_pipe_init loop pipe False
   r    <- uv_pipe_open pipe 0
-  cs   <- mallocPtrs Char BufSize
+  cs   <- mallocPtrs Bits8 BufSize
   _    <- uv_read_start pipe (allocBuf cs) (onStreamRead loop)
   _    <- uv_run loop UV_RUN_DEFAULT
   ignore $ uv_loop_close loop
 
-main : IO ()
-main = streamExample
+-- main : IO ()
+-- main = streamExample
 ```
 
 Two new concepts appear in the code example above: Initialization of pipes
 with `uv_pipe_open` and checking for the end of input by comparing
 the reading result with `UV_EOF`. All other concepts have already been
 explained before.
+
+In addition, we used streams for the first time. In libuv, TCP sockets,
+UDP sockets, and pipes for file I/O and inter process communication all
+are treated as streams, and the unit of data is `uv_buf_t` represented
+by `Ptr Buf` in Idris. It consists of a `base` field (a pointer to
+bytes) and the length. 
+
+### A TCP Echo Server
+
+Having seen a first example of input streams, it is not a big step to
+implement our first TCP server: A server listening on local IP address
+"0.0.0.0" and port 7000 that just echoes back the messages it gets
+from its clients.
+
+Below, we are setting up the skeleton of our applications. We need
+callbacks for when we get a new connection from a client, when
+we read data from the client, when we need to allocate memory
+for the client message, and when we have written data to a client.
+
+This is the core structure of a server application. The main work
+happens in function `echoRead`, where we typically process the client
+request and convert it to a response that will then be sent back
+to the client.
+
+```idris
+allocEchoBuffer : Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
+allocEchoBuffer _ size buf = do
+  cs <- mallocPtrs Bits8 size
+  initBuf buf cs size
+
+onNewConnection : Ptr Loop -> Ptr Stream -> Int32 -> IO ()
+
+echoRead : Ptr Stream -> Int32 -> Ptr Buf -> IO ()
+
+echoWrite : Ptr Buf -> Ptr Write -> Int32 -> IO ()
+echoWrite buf req status = do
+  freePtr buf
+  freePtr req
+  when (status < 0) (putStrLn "Write error \{uv_strerror status}")
+
+stopEcho : Ptr Tcp -> Ptr Signal -> Int32 -> IO ()
+stopEcho server _ sig = do
+  putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
+  ignore $ uv_close_sync server
+  putStrLn "Goodbye."
+
+echoExample : IO ()
+echoExample = do
+  loop   <- uv_default_loop
+  server <- mallocPtr Tcp
+  _      <- uv_tcp_init loop server
+
+  -- binding the server to local address 0.0.0.0 at port 7000
+  addr   <- mallocPtr SockAddrIn
+  _      <- uv_ip4_addr "0.0.0.0" 7000 addr
+  _      <- uv_tcp_bind server addr 0
+
+  -- start listening (this actually will start when we run the event loop)
+  putStrLn "Listening on 0.0.0.0 port 7000"
+  r      <- uv_listen server 128 (onNewConnection loop)
+
+  -- setting up a kill switch
+  kill   <- mallocPtr Signal
+  _      <- uv_signal_init loop kill
+  _      <- uv_unref kill
+  _      <- uv_signal_start kill (stopEcho server) uv_sigint 
+
+  when (r < 0) (die "Listen error: \{uv_strerror r}")
+  _      <- uv_run loop UV_RUN_DEFAULT
+
+  freePtr server
+  freePtr addr
+```
+
+Allocating data is straight forward as is cleaning up after we
+have sent our response to the client. The main application
+sets up a TCP socket at local address "0.0.0.0" on port 7000
+plus a handler for `SIGINT`, which allows us to gracefully shutdown
+the application.
+
+Let's implement `onNewConnection` next:
+
+```idris
+onNewConnection loop server status =
+  if status < 0
+     then putStrLn "New connection error \{uv_strerror status}"
+     else do
+       putStrLn "Got a new connection."
+       client <- mallocPtr Tcp
+       _      <- uv_tcp_init loop client
+       0      <- uv_accept server client | _ => uv_close client freePtr
+       ignore $ uv_read_start client allocEchoBuffer echoRead
+```
+
+Upon receiving a client request, we setup and accept a new connection
+with the client and start reading data from that connection. In
+case of an error, the connection to the client is properly closed.
+
+Finally, here's the implementation of `echoRead`:
+
+```idris
+echoRead client nread buf =
+  if nread > 0
+     then do
+       putStrLn "Got \{show nread} bytes of data"
+       req  <- mallocPtr Write
+       wbuf <- mallocPtr Buf
+       dat  <- getBufBase buf
+       initBuf wbuf dat (cast nread)
+       ignore $ uv_write req client wbuf 1 (echoWrite wbuf)
+     else do
+       putStrLn "Closing connection to client"
+       dat <- getBufBase buf
+       freePtr dat
+       uv_close client freePtr
+       when (nread /= UV_EOF) $ do
+         putStrLn "Read error \{uv_strerror nread}"
+
+main : IO ()
+main = echoExample
+```
+
+If we got some data, we typically process it and send a response to
+the client. Processing in this case is trivial, because we just
+echo the request back to the client. As usual, we need to allocate
+some bytes for setting up the write request and for sending the data.
+We then invoke `uv_write`, which will asynchronously send our response
+back to the client. When we reach the end of client input, we free
+the allocated memory and close the connection on our end.
+
+The application above as an important shortcoming: When we decide to
+shut down our server, the application will only terminate after every
+client session has ended. Since clients decide, when a session ends,
+this might take a long time. In a real world server we'd want to
+keep track of client sessions and close them on our end when we
+shutdown the server.
 
 <!-- vi: filetype=idris2:syntax=markdown
 -->
