@@ -63,6 +63,69 @@ int uv_get_ai_flags(struct addrinfo* info){return info->ai_flags;}
 
 struct sockaddr* uv_get_ai_addr(struct addrinfo* info){return info->ai_addr;}
 
+uint64_t uv_get_st_dev(uv_stat_t * stat){ return stat->st_dev;}
+
+uint64_t uv_get_st_mode(uv_stat_t * stat){ return stat->st_mode;}
+
+uint64_t uv_get_st_nlink(uv_stat_t * stat){ return stat->st_nlink;}
+
+uint64_t uv_get_st_uid(uv_stat_t * stat){ return stat->st_uid;}
+
+uint64_t uv_get_st_gid(uv_stat_t * stat){ return stat->st_gid;}
+
+uint64_t uv_get_st_rdev(uv_stat_t * stat){ return stat->st_rdev;}
+
+uint64_t uv_get_st_ino(uv_stat_t * stat){ return stat->st_ino;}
+
+uint64_t uv_get_st_size(uv_stat_t * stat){ return stat->st_size;}
+
+uint64_t uv_get_st_blksize(uv_stat_t * stat){ return stat->st_blksize;}
+
+uint64_t uv_get_st_blocks(uv_stat_t * stat){ return stat->st_blocks;}
+
+uint64_t uv_get_st_flags(uv_stat_t * stat){ return stat->st_flags;}
+
+uint64_t uv_get_st_gen(uv_stat_t * stat){ return stat->st_gen;}
+
+uv_timespec_t uv_get_st_atim(uv_stat_t * stat){ return stat->st_atim;}
+
+uv_timespec_t uv_get_st_mtim(uv_stat_t * stat){ return stat->st_mtim;}
+
+uv_timespec_t uv_get_st_ctim(uv_stat_t * stat){ return stat->st_ctim;}
+
+uv_timespec_t uv_get_st_birthtim(uv_stat_t * stat){ return stat->st_birthtim;}
+
+uv_dirent_t * uv_dirents(uv_dir_t * dir){return dir->dirents;}
+
+ssize_t uv_nentries(uv_dir_t * dir){return dir->nentries;}
+
+const char * uv_fs_get_dirent_name(uv_dirent_t * dirent){return dirent->name;}
+
+int uv_fs_get_dirent_type(uv_dirent_t * dirent){return dirent->type;}
+
+uint64_t uv_get_f_type(uv_statfs_t * stat){return stat->f_type;}
+
+uint64_t uv_get_f_bsize(uv_statfs_t * stat){return stat->f_bsize;}
+
+uint64_t uv_get_f_blocks(uv_statfs_t * stat){return stat->f_blocks;}
+
+uint64_t uv_get_f_bfree(uv_statfs_t * stat){return stat->f_bfree;}
+
+uint64_t uv_get_f_bavail(uv_statfs_t * stat){return stat->f_bavail;}
+
+uint64_t uv_get_f_files(uv_statfs_t * stat){return stat->f_files;}
+
+uint64_t uv_get_f_ffree(uv_statfs_t * stat){return stat->f_ffree;}
+
+int uv_dirent_unknown(){return UV_DIRENT_UNKNOWN;}
+int uv_dirent_file(){return UV_DIRENT_FILE;}
+int uv_dirent_dir(){return UV_DIRENT_DIR;}
+int uv_dirent_link(){return UV_DIRENT_LINK;}
+int uv_dirent_fifo(){return UV_DIRENT_FIFO;}
+int uv_dirent_socket(){return UV_DIRENT_SOCKET;}
+int uv_dirent_char(){return UV_DIRENT_CHAR;}
+int uv_dirent_block(){return UV_DIRENT_BLOCK;}
+
 int uv_sigabrt() {return SIGABRT;}
 int uv_sigfpe() {return SIGFPE;}
 int uv_sighup() {return SIGHUP;}

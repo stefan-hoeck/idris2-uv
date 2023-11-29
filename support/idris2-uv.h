@@ -41,6 +41,79 @@ int uv_get_ai_flags(struct addrinfo* info);
 
 struct sockaddr* uv_get_ai_addr(struct addrinfo* info);
 
+// uv_stat_t accessors
+
+uint64_t uv_get_st_dev(uv_stat_t * stat);
+
+uint64_t uv_get_st_mode(uv_stat_t * stat);
+
+uint64_t uv_get_st_nlink(uv_stat_t * stat);
+
+uint64_t uv_get_st_uid(uv_stat_t * stat);
+
+uint64_t uv_get_st_gid(uv_stat_t * stat);
+
+uint64_t uv_get_st_rdev(uv_stat_t * stat);
+
+uint64_t uv_get_st_ino(uv_stat_t * stat);
+
+uint64_t uv_get_st_size(uv_stat_t * stat);
+
+uint64_t uv_get_st_blksize(uv_stat_t * stat);
+
+uint64_t uv_get_st_blocks(uv_stat_t * stat);
+
+uint64_t uv_get_st_flags(uv_stat_t * stat);
+
+uint64_t uv_get_st_gen(uv_stat_t * stat);
+
+uv_timespec_t uv_get_st_atim(uv_stat_t * stat);
+
+uv_timespec_t uv_get_st_mtim(uv_stat_t * stat);
+
+uv_timespec_t uv_get_st_ctim(uv_stat_t * stat);
+
+uv_timespec_t uv_get_st_birthtim(uv_stat_t * stat);
+
+uv_dirent_t * uv_dirents(uv_dir_t * dir);
+
+ssize_t uv_nentries(uv_dir_t * dir);
+
+const char * uv_fs_get_dirent_name(uv_dirent_t * dirent);
+
+int uv_fs_get_dirent_type(uv_dirent_t * dirent);
+
+uint64_t uv_get_f_type(uv_statfs_t * stat);
+
+uint64_t uv_get_f_bsize(uv_statfs_t * stat);
+
+uint64_t uv_get_f_blocks(uv_statfs_t * stat);
+
+uint64_t uv_get_f_bfree(uv_statfs_t * stat);
+
+uint64_t uv_get_f_bavail(uv_statfs_t * stat);
+
+uint64_t uv_get_f_files(uv_statfs_t * stat);
+
+uint64_t uv_get_f_ffree(uv_statfs_t * stat);
+
+// dirent type
+int uv_dirent_unknown();
+
+int uv_dirent_file();
+
+int uv_dirent_dir();
+
+int uv_dirent_link();
+
+int uv_dirent_fifo();
+
+int uv_dirent_socket();
+
+int uv_dirent_char();
+
+int uv_dirent_block();
+
 // Signal Codes
 int uv_sigabrt();
 int uv_sigfpe();
