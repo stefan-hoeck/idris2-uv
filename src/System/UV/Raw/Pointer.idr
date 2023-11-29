@@ -9,11 +9,14 @@ import public System.FFI
 %default total
 
 --------------------------------------------------------------------------------
--- Buffers
+-- Buffers and Loops
 --------------------------------------------------------------------------------
 
 export
 data Buf : Type where
+
+export
+data Loop : Type where
 
 --------------------------------------------------------------------------------
 -- FFI
@@ -37,7 +40,7 @@ uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 
 %foreign (idris_uv "uv_init_buf")
-uv_init_buf : Ptr Buf -> Ptr Char -> Bits32 -> PrimIO ()
+uv_init_buf : Ptr Buf -> Ptr Bits8 -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_copy_buf")
 uv_copy_to_buf : Ptr Bits8 -> Buffer -> Bits32 -> PrimIO ()
@@ -47,6 +50,9 @@ uv_copy_from_buf : Buffer -> Ptr Bits8 -> Bits32 -> PrimIO ()
 
 %foreign "scheme:blodwen-buffer-getstring"
 uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
+
+export %foreign (idris_uv "uv_loop_sz")
+uv_loop_sz : Bits32
 
 export %foreign (idris_uv "uv_async_sz")
 uv_async_sz : Bits32
@@ -276,6 +282,7 @@ data PSize : (a : Type) -> (s : Bits32) -> Type where
   SOCKADDRIN     : PSize SockAddrIn Pointer.uv_sockaddr_in_sz
   SOCKADDRIN6    : PSize SockAddrIn6 Pointer.uv_sockaddr_in6_sz
   BUF            : PSize Buf Pointer.uv_buf_sz
+  LOOP           : PSize Loop Pointer.uv_loop_sz
   BYTE           : PSize Bits8 1
   CHAR           : PSize Char 1
 
@@ -345,6 +352,14 @@ data PCast : Type -> Type -> Type where
   IP4Addr              : PCast SockAddrIn SockAddr
   RevIP4Addr           : PCast SockAddr SockAddrIn
   IP6Addr              : PCast SockAddrIn6 SockAddr
+  ConnectReq           : PCast Connect Req
+  WriteReq             : PCast Write Req
+  ShutdownReq          : PCast Shutdown Req
+  UpdSendReq           : PCast UpdSend Req
+  FsReq                : PCast Fs Req
+  WorkReq              : PCast Work Req
+  GetAddrInfoReq       : PCast GetAddrInfo Req
+  GetNameInfoReq       : PCast GetNameInfo Req
   ByteChar             : PCast Bits8 Char
   CharByte             : PCast Char Bits8
 
@@ -377,7 +392,7 @@ getBufBase : HasIO io => Ptr Buf -> io (Ptr Bits8)
 getBufBase p = primIO $ uv_get_buf_base p
 
 export %inline
-initBuf : HasIO io => Ptr Buf -> Ptr Char -> Bits32 -> io ()
+initBuf : HasIO io => Ptr Buf -> Ptr Bits8 -> Bits32 -> io ()
 initBuf pbuf pcs len = primIO $ uv_init_buf pbuf pcs len
 
 ||| Allocates a char array of the given length, wrapping it
@@ -386,7 +401,7 @@ export
 mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
 mallocBuf size = do
   buf <- mallocPtr Buf
-  cs  <- mallocPtrs Char size
+  cs  <- mallocPtrs Bits8 size
   initBuf buf cs size
   pure buf
 

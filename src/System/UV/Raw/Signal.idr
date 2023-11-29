@@ -12,7 +12,7 @@ import System.UV.Raw.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_signal_init")
-prim__uv_signal_init : Ptr LoopPtr -> Ptr Signal -> PrimIO Int32
+prim__uv_signal_init : Ptr Loop -> Ptr Signal -> PrimIO Int32
 
 %foreign (idris_uv "uv_signal_start")
 prim__uv_signal_start :
@@ -61,7 +61,7 @@ uv_sigusr2 : Int32
 parameters {auto has : HasIO io}
 
   export %inline
-  uv_signal_init : Ptr LoopPtr -> Ptr Signal -> io Int32
+  uv_signal_init : Ptr Loop -> Ptr Signal -> io Int32
   uv_signal_init p si = primIO (prim__uv_signal_init p si)
 
   ||| Start the handle with the given callback, watching for the given signal.

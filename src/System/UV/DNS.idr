@@ -96,7 +96,7 @@ record SockInfo where
 
 export %inline
 getAddrInfo :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (node, service : String)
   -> SockInfo
   -> (Either UVError (Ptr AddrInfo) -> IO ())

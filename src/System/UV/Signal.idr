@@ -57,7 +57,7 @@ go (More x) act res h c = do
 ||| Runs the given `IO` action each time the given signal
 ||| is received until it either returns `False` or the `Fuel` runs dry.
 export
-repeatedlyOnSignal : (l : Loop) => Fuel -> SigCode -> IO Bool -> UVIO Resource
+repeatedlyOnSignal : (l : UVLoop) => Fuel -> SigCode -> IO Bool -> UVIO Resource
 repeatedlyOnSignal f c act = do
   h <- mallocPtr Signal
   uvio $ uv_signal_init l.loop h
@@ -68,5 +68,5 @@ repeatedlyOnSignal f c act = do
 
 ||| Runs the given `IO` action once when the given signal is received.
 export %inline
-onSignal : Loop => SigCode -> IO () -> UVIO Resource
+onSignal : UVLoop => SigCode -> IO () -> UVIO Resource
 onSignal c act = repeatedlyOnSignal (limit 1) c (act $> False)

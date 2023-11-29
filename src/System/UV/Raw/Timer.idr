@@ -16,7 +16,7 @@ import System.UV.Raw.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_timer_init")
-prim__uv_timer_init : Ptr LoopPtr -> Ptr Timer -> PrimIO Int32
+prim__uv_timer_init : Ptr Loop -> Ptr Timer -> PrimIO Int32
 
 %foreign (idris_uv "uv_timer_start")
 prim__uv_timer_start :
@@ -47,7 +47,7 @@ prim__uv_timer_again : Ptr Timer -> PrimIO Int32
 
 ||| Initialize the handle.
 export %inline
-uv_timer_init : HasIO io => Ptr LoopPtr -> Ptr Timer -> io Int32
+uv_timer_init : HasIO io => Ptr Loop -> Ptr Timer -> io Int32
 uv_timer_init ptr ti = primIO $ prim__uv_timer_init ptr ti
 
 ||| Start the timer. timeout and repeat are in milliseconds.

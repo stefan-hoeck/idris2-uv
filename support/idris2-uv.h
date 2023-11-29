@@ -12,7 +12,11 @@ void* uv_copy_buf(char * src, char * dest, int len);
 
 void* uv_init_buf(uv_buf_t * buf, char * base, unsigned int len);
 
+void* uv_close_sync(uv_handle_t *handle);
+
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
+
+int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags, int mode)
 
 int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset);
 
@@ -99,8 +103,9 @@ size_t uv_work_sz();
 size_t uv_getaddrinfo_sz();
 size_t uv_getnameinfo_sz();
 
-// Size of uv_buf struct
+// Size of uv_buf and loop struct
 size_t uv_buf_sz();
+size_t uv_loop_sz();
 
 // addrinfo constants
 size_t uv_addrinfo_sz();
@@ -125,6 +130,11 @@ int uv_ipproto_icmp();
 int uv_ipproto_raw();
 int uv_ipproto_tcp();
 int uv_ipproto_udp();
+
+// Run modes
+int uv_run_default();
+int uv_run_once();
+int uv_run_nowait();
 
 // Error codes
 int uv_EOF();

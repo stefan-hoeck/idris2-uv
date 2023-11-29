@@ -2,6 +2,7 @@ module System.UV.Error
 
 import public Control.Monad.Either
 import Derive.Prelude
+import System.UV.Pointer
 import System.UV.Util
 
 %default total
@@ -12,10 +13,10 @@ import System.UV.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_strerror")
-prim__uv_strerror : Int32 -> String
+prim__uv_strerror : Int32 -> Ptr Char
 
 %foreign (idris_uv "uv_err_name")
-prim__uv_err_name : Int32 -> String
+prim__uv_err_name : Int32 -> Ptr Char
 
 export %foreign (idris_uv "uv_EOF")
 UV_EOF : Int32
@@ -23,6 +24,14 @@ UV_EOF : Int32
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
+
+export %inline
+uv_err_name : Int32 -> String
+uv_err_name = getString . prim__uv_err_name
+
+export %inline
+uv_strerror : Int32 -> String
+uv_strerror = getString . prim__uv_strerror
 
 ||| Core error type for working with this library.
 public export
@@ -34,7 +43,7 @@ record UVError where
 
 export
 fromCode : Int32 -> UVError
-fromCode n = MkUVError n (prim__uv_err_name n) (prim__uv_strerror n)
+fromCode n = MkUVError n (uv_err_name n) (uv_strerror n)
 
 %runElab derive "UVError" [Show,Eq]
 

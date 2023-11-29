@@ -8,3 +8,8 @@ test = "test/test.ipkg"
 type = "local"
 path = "test"
 ipkg = "test.ipkg"
+
+[custom.all.uv-docs]
+type = "local"
+path = "docs"
+ipkg = "uv-docs.ipkg"

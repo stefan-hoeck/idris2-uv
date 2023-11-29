@@ -1,0 +1,10 @@
+package idris2-uv
+version = 0.1.0
+authors = "stefan-hoeck"
+brief   = "Documentation for idris2-uv"
+
+depends = uv
+
+modules = Docs.UV.Intro
+
+sourcedir = "src"

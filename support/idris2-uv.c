@@ -26,6 +26,12 @@ int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
   return uv_fs_close(loop, &req, file, NULL);
 }
 
+int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags, int mode) {
+  return uv_fs_open(loop, req, path, flags, mode, NULL);
+}
+
+void * uv_close_sync(uv_handle_t *handle){ uv_close(handle, NULL); }
+
 int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset) {
   uv_fs_t req;
   int res = uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);
@@ -115,6 +121,7 @@ size_t uv_getaddrinfo_sz() {return uv_req_size(UV_GETADDRINFO);}
 size_t uv_getnameinfo_sz() {return uv_req_size(UV_GETNAMEINFO);}
 
 size_t uv_buf_sz() {return sizeof(uv_buf_t);}
+size_t uv_loop_sz() {return sizeof(uv_loop_t);}
 size_t uv_sockaddr_in_sz() {return sizeof(struct sockaddr_in);}
 size_t uv_sockaddr_in6_sz() {return sizeof(struct sockaddr_in6);}
 size_t uv_sockaddr_sz() {return sizeof(struct sockaddr);}
@@ -134,5 +141,9 @@ int uv_ipproto_icmp() { return IPPROTO_ICMP; }
 int uv_ipproto_raw() { return IPPROTO_RAW; }
 int uv_ipproto_tcp() { return IPPROTO_TCP; }
 int uv_ipproto_udp() { return IPPROTO_UDP; }
+
+int uv_run_default() {return UV_RUN_DEFAULT;}
+int uv_run_once() {return UV_RUN_ONCE;}
+int uv_run_nowait() {return UV_RUN_NOWAIT;}
 
 int uv_EOF() {return UV_EOF;}

@@ -22,7 +22,7 @@ import public System.UV.Raw.Timer
 ||| be stopped from there as well.
 export
 timer :
-     {auto l : Loop}
+     {auto l : UVLoop}
   -> (timeout,repeat : Bits64)
   -> (Resource -> IO ())
   -> UVIO Resource 
@@ -38,7 +38,7 @@ timer t r act = do
 |||
 ||| Execution can be stopped whenever the returned `Resource` is released.
 export %inline
-repeatedly : (l : Loop) => (timeout,repeat : Bits64) -> IO () -> UVIO Resource 
+repeatedly : (l : UVLoop) => (timeout,repeat : Bits64) -> IO () -> UVIO Resource 
 repeatedly t r = timer t r . const
 
 ||| Invokes the given IO action after `timeout` milliseconds.
@@ -47,5 +47,5 @@ repeatedly t r = timer t r . const
 ||| Note: All resources are freed automatically
 |||       after the IO action has been resolved.
 export %inline
-delayed : (l : Loop) => (timeout : Bits64) -> IO () -> UVIO Resource 
+delayed : (l : UVLoop) => (timeout : Bits64) -> IO () -> UVIO Resource 
 delayed t act = timer t 0 (\res => act >> release res)
