@@ -17,10 +17,10 @@ void *uv_close_sync(uv_handle_t *handle);
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
 
 int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags,
-                    int mode)
+                    int mode);
 
-    int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
-                         unsigned int nbufs, int64_t offset);
+int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
+                     unsigned int nbufs, int64_t offset);
 
 int uv_EOF();
 
@@ -99,9 +99,9 @@ uint64_t uv_get_f_files(uv_statfs_t *stat);
 
 uint64_t uv_get_f_ffree(uv_statfs_t *stat);
 
-long uv_get_tv_sec(uv_timespec_t time);
+int64_t uv_get_tv_sec(uv_timespec_t time);
 
-long uv_get_tv_nsec(uv_timespec_t time);
+int64_t uv_get_tv_nsec(uv_timespec_t time);
 
 // dirent type
 int uv_dirent_unknown();
