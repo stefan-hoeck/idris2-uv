@@ -170,7 +170,7 @@ signalExample = do
   killSwitch <- mallocPtr Signal
   _          <- uv_signal_init loop killSwitch
   _          <- uv_unref killSwitch
-  _          <- uv_signal_start killSwitch (stop idler) uv_sigint 
+  _          <- uv_signal_start killSwitch (stop idler) uv_sigint
 
   -- running the app
   _          <- uv_run loop UV_RUN_DEFAULT
@@ -309,7 +309,7 @@ offset) and free the allocated buffer.
 
 In order to to simplify things, we closed the file.
 This will block the event loop but for simple one-off operations
-like this, that's usually alright. 
+like this, that's usually alright.
 Otherwise, we'd have to allocate and free even more stuff.
 
 Note, that we can run all file requests synchronously in libuv
@@ -336,7 +336,7 @@ fileExample2 : IO ()
 fileExample2 = do
   (_::p::_) <- getArgs | _ => die "Invalid number of arguments"
   loop  <- uv_default_loop
-  
+
   -- Setting up the idler
   ref   <- newIORef Z
   idler <- mallocPtr Idle
@@ -389,7 +389,7 @@ onStreamRead loop stream res buf = do
 streamExample : IO ()
 streamExample = do
   loop <- uv_default_loop
-  
+
   pipe <- mallocPtr Pipe
   _    <- uv_pipe_init loop pipe False
   r    <- uv_pipe_open pipe 0
@@ -411,7 +411,7 @@ In addition, we used streams for the first time. In libuv, TCP sockets,
 UDP sockets, and pipes for file I/O and inter process communication all
 are treated as streams, and the unit of data is `uv_buf_t` represented
 by `Ptr Buf` in Idris. It consists of a `base` field (a pointer to
-bytes) and the length. 
+bytes) and the length.
 
 ### A TCP Echo Server
 
@@ -471,7 +471,7 @@ echoExample = do
   kill   <- mallocPtr Signal
   _      <- uv_signal_init loop kill
   _      <- uv_unref kill
-  _      <- uv_signal_start kill (stopEcho server) uv_sigint 
+  _      <- uv_signal_start kill (stopEcho server) uv_sigint
 
   when (r < 0) (die "Listen error: \{uv_strerror r}")
   _      <- uv_run loop UV_RUN_DEFAULT
@@ -524,8 +524,8 @@ echoRead client nread buf =
        when (nread /= UV_EOF) $ do
          putStrLn "Read error \{uv_strerror nread}"
 
-main : IO ()
-main = echoExample
+-- main : IO ()
+-- main = echoExample
 ```
 
 If we got some data, we typically process it and send a response to
@@ -542,6 +542,68 @@ client session has ended. Since clients decide, when a session ends,
 this might take a long time. In a real world server we'd want to
 keep track of client sessions and close them on our end when we
 shutdown the server.
+
+### A TCP Client
+
+Writing a TCP client is not much different from writing
+a server:
+
+```idris
+onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
+onClientRead loop stream res buf = do
+  if res < 0
+     then when (res /= UV_EOF) (putStrLn "Error: \{uv_strerror res}") >>
+          ignore (uv_close stream freePtr)
+     else setBufLen buf (cast res) >>
+          ignore (uv_fs_write_sync loop 1 buf 1 (-1))
+
+  getBufBase buf >>= freePtr
+
+onClientWrite : Ptr Loop -> Ptr Tcp -> Ptr Write -> Int32 -> IO ()
+onClientWrite loop client write status = do
+  freePtr write
+  ignore $ uv_read_start client allocEchoBuffer (onClientRead loop)
+
+onClientConnect : Ptr Loop -> Ptr Tcp -> Ptr Connect -> Int32 -> IO ()
+onClientConnect loop client connect status = do
+  freePtr connect
+  if status < 0
+     then putStrLn "New connection error: \{uv_strerror status}"
+     else do
+       putStrLn "Got a new connection."
+       req  <- mallocPtr Write
+       dat  <- fromString "Hello? Anybody out there?\n"
+       ignore $ uv_write req client dat 1 (onClientWrite loop client)
+
+clientExample : IO ()
+clientExample = do
+  loop   <- uv_default_loop
+  socket <- mallocPtr Tcp
+  _      <- uv_tcp_init loop socket
+
+  -- binding the server to local address 0.0.0.0 at port 7000
+  addr   <- mallocPtr SockAddrIn
+  _      <- uv_ip4_addr "localhost" 7000 addr
+
+  -- start listening (this actually will start when we run the event loop)
+  putStrLn "Connecting to 0.0.0.0 port 7000"
+  connect <- mallocPtr Connect
+  r       <- uv_tcp_connect connect socket addr (onClientConnect loop socket)
+
+  when (r < 0) (die "Connect error: \{uv_strerror r}")
+  _      <- uv_run loop UV_RUN_DEFAULT
+
+  freePtr addr
+
+-- main : IO ()
+-- main = clientExample
+```
+
+And while the above example might now (hopefully) be pretty clear, it's
+also obvious that this kind of code is getting far too tedious to
+write. So, the next step will be to factor out certain reoccurring
+patterns and add a layer of proper immutable Idris types on top
+of it all. That's for the second part of the tutorial.
 
 <!-- vi: filetype=idris2:syntax=markdown
 -->

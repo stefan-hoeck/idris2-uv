@@ -110,10 +110,7 @@ getAddrInfo n s (SI f t p) cb = do
   res   <- uv_getaddrinfo
     l.loop
     pg
-    (\pa,st,pa => do
-        freePtr pa
-        freePtr hints
-        cb (uvRes st $> pa))
+    (\pa,st,pa => freePtr pa >> freePtr hints >> cb (uvRes st $> pa))
     n
     s
     hints
