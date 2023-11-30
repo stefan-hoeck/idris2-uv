@@ -70,7 +70,7 @@ record Flags where
   constructor MkFlags
   flags : Bits32
 
-%runElab derive "Flags" [Show,Eq,Ord]
+%runElab derive "Flags" [Show,Eq,Ord,Num]
 
 export %inline
 Semigroup Flags where
@@ -110,7 +110,7 @@ record Mode where
   constructor MkMode
   mode : Bits32
 
-%runElab derive "Flags.Mode" [Show,Eq,Ord]
+%runElab derive "Flags.Mode" [Show,Eq,Ord,Num]
 
 export %inline
 Semigroup Flags.Mode where
