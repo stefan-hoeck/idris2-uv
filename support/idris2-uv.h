@@ -97,6 +97,10 @@ uint64_t uv_get_f_files(uv_statfs_t * stat);
 
 uint64_t uv_get_f_ffree(uv_statfs_t * stat);
 
+long uv_get_tv_sec(uv_timespec_t time);
+
+long uv_get_tv_nsec(uv_timespec_t time);
+
 // dirent type
 int uv_dirent_unknown();
 

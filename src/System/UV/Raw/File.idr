@@ -72,6 +72,9 @@ st_mtim : Ptr Stat -> UV_Timespec_T
 export %foreign (idris_uv "uv_get_st_ctim")
 st_ctim : Ptr Stat -> UV_Timespec_T
 
+export %foreign (idris_uv "uv_get_st_birthtim")
+st_birthtim : Ptr Stat -> UV_Timespec_T
+
 export %foreign (idris_uv "uv_get_f_type")
 f_type : Ptr StatFs -> Bits64
 
@@ -93,8 +96,11 @@ f_files : Ptr StatFs -> Bits64
 export %foreign (idris_uv "uv_get_f_ffree")
 f_ffree : Ptr StatFs -> Bits64
 
-export %foreign (idris_uv "uv_get_st_birthtim")
-st_birthtim : Ptr Stat -> UV_Timespec_T
+export %foreign (idris_uv "uv_get_tv_sec")
+tv_sec : UV_Timespec_T -> Int64
+
+export %foreign (idris_uv "uv_get_tv_nsec")
+tv_nsec : UV_Timespec_T -> Int64
 
 export %foreign (idris_uv "uv_dirent_unknown")
 UV_DIRENT_UNKNOWN : Int32
@@ -314,6 +320,172 @@ prim__uv_fs_close :
 
 %foreign (idris_uv "uv_fs_close_sync")
 prim__uv_fs_close_sync : Ptr Loop -> (file : Int32) -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_rename")
+prim__uv_fs_rename :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path, newpath : String)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fsync")
+prim__uv_fs_fsync :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fdatasync")
+prim__uv_fs_fdatasync :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fdatasync")
+prim__uv_fs_ftruncate :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : Int32)
+  -> (offset : Int64)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fdatasync")
+prim__uv_fs_copyfile :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path, newpath : String)
+  -> (flags : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_sendfile")
+prim__uv_fs_sendfile :
+     Ptr Loop
+  -> Ptr Fs
+  -> (outFile, inFile : Int32)
+  -> (offset : Int64)
+  -> (length : Bits32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_access")
+prim__uv_fs_access :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (mode : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_chmod")
+prim__uv_fs_chmod :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (mode : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fchmod")
+prim__uv_fs_fchmod :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : Int32)
+  -> (mode : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_utime")
+prim__uv_fs_utime :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (atime, mtime : Double)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_futime")
+prim__uv_fs_futime :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : Int32)
+  -> (atime, mtime : Double)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_lutime")
+prim__uv_fs_lutime :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (atime, mtime : Double)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_link")
+prim__uv_fs_link :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path, newpath : String)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_symlink")
+prim__uv_fs_symlink :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path, newpath : String)
+  -> (flags : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_readlink")
+prim__uv_fs_readlink :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_realpath")
+prim__uv_fs_realpath :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_chown")
+prim__uv_fs_chown :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (uid, gid : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_fchown")
+prim__uv_fs_fchown :
+     Ptr Loop
+  -> Ptr Fs
+  -> (file : String)
+  -> (uid, gid : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
+
+%foreign (idris_uv "uv_fs_lchown")
+prim__uv_fs_lchown :
+     Ptr Loop
+  -> Ptr Fs
+  -> (path : String)
+  -> (uid, gid : Int32)
+  -> (cb   : Ptr Fs -> PrimIO ())
+  -> PrimIO Int32
 
 --------------------------------------------------------------------------------
 -- API
@@ -633,286 +805,282 @@ parameters {auto has : HasIO io}
   uv_fs_statfs loop fs path cb =
     primIO $ prim__uv_fs_statfs loop fs path (\p => toPrim $ cb p)
 
+  ||| Equivalent to rename(2).
+  export %inline
+  uv_fs_rename :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path, newpath : String)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_rename loop fs path newpath cb =
+    primIO $ prim__uv_fs_rename loop fs path newpath (\p => toPrim $ cb p)
 
--- Data types
---     type uv_timespec_t
---            Y2K38-unsafe data type for storing times with nanosecond resolution.  Will be replaced with uv_timespec64_t in libuv v2.0.
---
---               typedef struct {
---                   long tv_sec;
---                   long tv_nsec;
---               } uv_timespec_t;
---
---
--- API
---
---     int uv_fs_rename(uv_loop_t *loop, uv_fs_t *req, const char *path, const char *new_path, uv_fs_cb cb)
---            Equivalent to rename(2).
---
---     int uv_fs_fsync(uv_loop_t *loop, uv_fs_t *req, uv_file file, uv_fs_cb cb)
---            Equivalent to fsync(2).
---
---            NOTE:
---               For AIX, uv_fs_fsync returns UV_EBADF on file descriptors referencing non regular files.
---
---     int uv_fs_fdatasync(uv_loop_t *loop, uv_fs_t *req, uv_file file, uv_fs_cb cb)
---            Equivalent to fdatasync(2).
---
---     int uv_fs_ftruncate(uv_loop_t *loop, uv_fs_t *req, uv_file file, int64_t offset, uv_fs_cb cb)
---            Equivalent to ftruncate(2).
---
---     int uv_fs_copyfile(uv_loop_t *loop, uv_fs_t *req, const char *path, const char *new_path, int flags, uv_fs_cb cb)
---            Copies a file from path to new_path. Supported flags are described below.
---
---            • UV_FS_COPYFILE_EXCL: If present, uv_fs_copyfile() will fail with UV_EEXIST if the destination path already exists. The default behavior is to overwrite the destination if it exists.
---
---            • UV_FS_COPYFILE_FICLONE: If present, uv_fs_copyfile() will attempt to create a copy-on-write reflink. If the underlying platform does not support copy-on-write, or an error occurs while attempting to use copy-on-write,
---              a fallback copy mechanism based on uv_fs_sendfile() is used.
---
---            • UV_FS_COPYFILE_FICLONE_FORCE: If present, uv_fs_copyfile() will attempt to create a copy-on-write reflink. If the underlying platform does not support  copy-on-write,  or  an  error  occurs  while  attempting  to  use
---              copy-on-write, then an error is returned.
---
---            WARNING:
---               If  the destination path is created, but an error occurs while copying the data, then the destination path is removed. There is a brief window of time between closing and removing the file where another process could
---               access the file.
---
---            New in version 1.14.0.
---
---            Changed in version 1.20.0: UV_FS_COPYFILE_FICLONE and UV_FS_COPYFILE_FICLONE_FORCE are supported.
---
---            Changed in version 1.33.0: If an error occurs while using UV_FS_COPYFILE_FICLONE_FORCE, that error is returned. Previously, all errors were mapped to UV_ENOTSUP.
---
---     int uv_fs_sendfile(uv_loop_t *loop, uv_fs_t *req, uv_file out_fd, uv_file in_fd, int64_t in_offset, size_t length, uv_fs_cb cb)
---            Limited equivalent to sendfile(2).
---
---     int uv_fs_access(uv_loop_t *loop, uv_fs_t *req, const char *path, int mode, uv_fs_cb cb)
---            Equivalent to access(2) on Unix. Windows uses GetFileAttributesW().
---
---     int uv_fs_chmod(uv_loop_t *loop, uv_fs_t *req, const char *path, int mode, uv_fs_cb cb)
---
---     int uv_fs_fchmod(uv_loop_t *loop, uv_fs_t *req, uv_file file, int mode, uv_fs_cb cb)
---            Equivalent to chmod(2) and fchmod(2) respectively.
---
---     int uv_fs_utime(uv_loop_t *loop, uv_fs_t *req, const char *path, double atime, double mtime, uv_fs_cb cb)
---
---     int uv_fs_futime(uv_loop_t *loop, uv_fs_t *req, uv_file file, double atime, double mtime, uv_fs_cb cb)
---
---     int uv_fs_lutime(uv_loop_t *loop, uv_fs_t *req, const char *path, double atime, double mtime, uv_fs_cb cb)
---            Equivalent to utime(2), futimes(3) and lutimes(3) respectively.
---
---            NOTE:
---               z/OS: uv_fs_lutime() is not implemented for z/OS. It can still be called but will return UV_ENOSYS.
---
---            NOTE:
---               AIX: uv_fs_futime() and uv_fs_lutime() functions only work for AIX 7.1 and newer.  They can still be called on older versions but will return UV_ENOSYS.
---
---            Changed in version 1.10.0: sub-second precission is supported on Windows
---
---     int uv_fs_link(uv_loop_t *loop, uv_fs_t *req, const char *path, const char *new_path, uv_fs_cb cb)
---            Equivalent to link(2).
---
---     int uv_fs_symlink(uv_loop_t *loop, uv_fs_t *req, const char *path, const char *new_path, int flags, uv_fs_cb cb)
---            Equivalent to symlink(2).
---
---            NOTE:
---               On Windows the flags parameter can be specified to control how the symlink will be created:
---
---                   • UV_FS_SYMLINK_DIR: indicates that path points to a directory.
---
---                   • UV_FS_SYMLINK_JUNCTION: request that the symlink is created using junction points.
---
---     int uv_fs_readlink(uv_loop_t *loop, uv_fs_t *req, const char *path, uv_fs_cb cb)
---            Equivalent to readlink(2).  The resulting string is stored in req->ptr.
---
---     int uv_fs_realpath(uv_loop_t *loop, uv_fs_t *req, const char *path, uv_fs_cb cb)
---            Equivalent to realpath(3) on Unix. Windows uses GetFinalPathNameByHandle.  The resulting string is stored in req->ptr.
---
---            WARNING:
---               This function has certain platform-specific caveats that were discovered when used in Node.
---
---               • macOS and other BSDs: this function will fail with UV_ELOOP if more than 32 symlinks are found while resolving the given path.  This limit is hardcoded and cannot be sidestepped.
---
---               • Windows: while this function works in the common case, there are a number of corner cases where it doesn't:
---
---                 • Paths in ramdisk volumes created by tools which sidestep the Volume Manager (such as ImDisk) cannot be resolved.
---
---                 • Inconsistent casing when using drive letters.
---
---                 • Resolved path bypasses subst'd drives.
---
---               While this function can still be used, it's not recommended if scenarios such as the above need to be supported.
---
---               The background story and some more details on these issues can be checked here.
---
---            New in version 1.8.0.
---
---     int uv_fs_chown(uv_loop_t *loop, uv_fs_t *req, const char *path, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb)
---
---     int uv_fs_fchown(uv_loop_t *loop, uv_fs_t *req, uv_file file, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb)
---
---     int uv_fs_lchown(uv_loop_t *loop, uv_fs_t *req, const char *path, uv_uid_t uid, uv_gid_t gid, uv_fs_cb cb)
---            Equivalent to chown(2), fchown(2) and lchown(2) respectively.
---
---            NOTE:
---               These functions are not implemented on Windows.
---
---            Changed in version 1.21.0: implemented uv_fs_lchown
---
---     uv_fs_type uv_fs_get_type(const uv_fs_t *req)
---            Returns req->fs_type.
---
---            New in version 1.19.0.
---
---     ssize_t uv_fs_get_result(const uv_fs_t *req)
---            Returns req->result.
---
---            New in version 1.19.0.
---
---     int uv_fs_get_system_error(const uv_fs_t *req)
---            Returns the platform specific error code - GetLastError() value on Windows and -(req->result) on other platforms.
---
---            New in version 1.38.0.
---
---     void *uv_fs_get_ptr(const uv_fs_t *req)
---            Returns req->ptr.
---
---            New in version 1.19.0.
---
---     const char *uv_fs_get_path(const uv_fs_t *req)
---            Returns req->path.
---
---            New in version 1.19.0.
---
---     uv_stat_t *uv_fs_get_statbuf(uv_fs_t *req)
---            Returns &req->statbuf.
---
---            New in version 1.19.0.
---
---     SEE ALSO:
---        The uv_req_t API functions also apply.
---
--- Helper functions
---     uv_os_fd_t uv_get_osfhandle(int fd)
---            For a file descriptor in the C runtime, get the OS-dependent handle.  On UNIX, returns the fd intact. On Windows, this calls _get_osfhandle.  Note that the return value is still owned by the C runtime, any  attempts  to
---            close it or to use it after closing the fd may lead to malfunction.
---               New in version 1.12.0.
---
---     int uv_open_osfhandle(uv_os_fd_t os_fd)
---            For  a OS-dependent handle, get the file descriptor in the C runtime.  On UNIX, returns the os_fd intact. On Windows, this calls _open_osfhandle.  Note that this consumes the argument, any attempts to close it or to use
---            it after closing the return value may lead to malfunction.
---               New in version 1.23.0.
---
--- File open constants
---     UV_FS_O_APPEND
---            The file is opened in append mode. Before each write, the file offset is positioned at the end of the file.
---
---     UV_FS_O_CREAT
---            The file is created if it does not already exist.
---
---     UV_FS_O_DIRECT
---            File I/O is done directly to and from user-space buffers, which must be aligned. Buffer size and address should be a multiple of the physical sector size of the block device.
---
---            NOTE:
---               UV_FS_O_DIRECT is supported on Linux, and on Windows via FILE_FLAG_NO_BUFFERING.  UV_FS_O_DIRECT is not supported on macOS.
---
---     UV_FS_O_DIRECTORY
---            If the path is not a directory, fail the open.
---
---            NOTE:
---               UV_FS_O_DIRECTORY is not supported on Windows.
---
---     UV_FS_O_DSYNC
---            The file is opened for synchronous I/O. Write operations will complete once all data and a minimum of metadata are flushed to disk.
---
---            NOTE:
---               UV_FS_O_DSYNC is supported on Windows via FILE_FLAG_WRITE_THROUGH.
---
---     UV_FS_O_EXCL
---            If the O_CREAT flag is set and the file already exists, fail the open.
---
---            NOTE:
---               In general, the behavior of O_EXCL is undefined if it is used without O_CREAT. There is one exception: on Linux 2.6 and later, O_EXCL can be used without O_CREAT if pathname refers to a block device. If the block de‐
---               vice is in use by the system (e.g., mounted), the open will fail with the error EBUSY.
---
---     UV_FS_O_EXLOCK
---            Atomically obtain an exclusive lock.
---
---            NOTE:
---               UV_FS_O_EXLOCK is only supported on macOS and Windows.
---
---            Changed in version 1.17.0: support is added for Windows.
---
---     UV_FS_O_FILEMAP
---            Use a memory file mapping to access the file. When using this flag, the file cannot be open multiple times concurrently.
---
---            NOTE:
---               UV_FS_O_FILEMAP is only supported on Windows.
---
---     UV_FS_O_NOATIME
---            Do not update the file access time when the file is read.
---
---            NOTE:
---               UV_FS_O_NOATIME is not supported on Windows.
---
---     UV_FS_O_NOCTTY
---            If the path identifies a terminal device, opening the path will not cause that terminal to become the controlling terminal for the process (if the process does not already have one).
---
---            NOTE:
---               UV_FS_O_NOCTTY is not supported on Windows.
---
---     UV_FS_O_NOFOLLOW
---            If the path is a symbolic link, fail the open.
---
---            NOTE:
---               UV_FS_O_NOFOLLOW is not supported on Windows.
---
---     UV_FS_O_NONBLOCK
---            Open the file in nonblocking mode if possible.
---
---            NOTE:
---               UV_FS_O_NONBLOCK is not supported on Windows.
---
---     UV_FS_O_RANDOM
---            Access is intended to be random. The system can use this as a hint to optimize file caching.
---
---            NOTE:
---               UV_FS_O_RANDOM is only supported on Windows via FILE_FLAG_RANDOM_ACCESS.
---
---     UV_FS_O_RDONLY
---            Open the file for read-only access.
---
---     UV_FS_O_RDWR
---            Open the file for read-write access.
---
---     UV_FS_O_SEQUENTIAL
---            Access is intended to be sequential from beginning to end. The system can use this as a hint to optimize file caching.
---
---            NOTE:
---               UV_FS_O_SEQUENTIAL is only supported on Windows via FILE_FLAG_SEQUENTIAL_SCAN.
---
---     UV_FS_O_SHORT_LIVED
---            The file is temporary and should not be flushed to disk if possible.
---
---            NOTE:
---               UV_FS_O_SHORT_LIVED is only supported on Windows via FILE_ATTRIBUTE_TEMPORARY.
---
---     UV_FS_O_SYMLINK
---            Open the symbolic link itself rather than the resource it points to.
---
---     UV_FS_O_SYNC
---            The file is opened for synchronous I/O. Write operations will complete once all data and all metadata are flushed to disk.
---
---            NOTE:
---               UV_FS_O_SYNC is supported on Windows via FILE_FLAG_WRITE_THROUGH.
---
---     UV_FS_O_TEMPORARY
---            The file is temporary and should not be flushed to disk if possible.
---
---            NOTE:
---               UV_FS_O_TEMPORARY is only supported on Windows via FILE_ATTRIBUTE_TEMPORARY.
---
---     UV_FS_O_TRUNC
---            If the file exists and is a regular file, and the file is opened successfully for write access, its length shall be truncated to zero.
---
---     UV_FS_O_WRONLY
---            Open the file for write-only access.
+  ||| Equivalent to fsync(2).
+  |||
+  ||| NOTE:
+  |||    For AIX, uv_fs_fsync returns UV_EBADF on file
+  |||    descriptors referencing non regular files.
+  export %inline
+  uv_fs_fsync :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_fsync loop fs file cb =
+    primIO $ prim__uv_fs_fsync loop fs file (\p => toPrim $ cb p)
+
+  ||| Equivalent to fdatasync(2).
+  export %inline
+  uv_fs_fdatasync :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_fdatasync loop fs file cb =
+    primIO $ prim__uv_fs_fdatasync loop fs file (\p => toPrim $ cb p)
+
+  ||| Equivalent to ftruncate(2).
+  export %inline
+  uv_fs_ftruncate :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : Int32)
+    -> (offset : Int64)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_ftruncate loop fs file offset cb =
+    primIO $ prim__uv_fs_ftruncate loop fs file offset (\p => toPrim $ cb p)
+
+  ||| Copies a file from path to new_path.
+  ||| Supported flags are described below.
+  |||
+  ||| • UV_FS_COPYFILE_EXCL: If present, `uv_fs_copyfile` will fail
+  |||   with UV_EEXIST if the destination path already exists.
+  |||   The default behavior is to overwrite the destination if it exists.
+  |||
+  ||| • UV_FS_COPYFILE_FICLONE: If present, `uv_fs_copyfile` will
+  |||   attempt to create a copy-on-write reflink. If the underlying
+  |||   platform does not support copy-on-write, or an error occurs
+  |||   while attempting to use copy-on-write,
+  |||   a fallback copy mechanism based on uv_fs_sendfile() is used.
+  |||
+  ||| • UV_FS_COPYFILE_FICLONE_FORCE: If present, `uv_fs_copyfile`
+  |||   will attempt to create a copy-on-write reflink. If the
+  |||   underlying platform does not support  copy-on-write, or an error
+  |||   occurs while attempting to use copy-on-write, then an error is returned.
+  |||
+  ||| WARNING:
+  |||    If  the destination path is created, but an error occurs while copying
+  |||    the data, then the destination path is removed. There is a brief
+  |||    window of time between closing and removing the file where
+  |||    another process could access the file.
+  export %inline
+  uv_fs_copyfile :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path, newpath : String)
+    -> (flags : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_copyfile loop fs path newpath flags cb =
+    primIO $ prim__uv_fs_copyfile loop fs path newpath flags (\p => toPrim $ cb p)
+
+  ||| Limited equivalent to sendfile(2).
+  export %inline
+  uv_fs_sendfile :
+       Ptr Loop
+    -> Ptr Fs
+    -> (outFile, inFile : Int32)
+    -> (offset : Int64)
+    -> (length : Bits32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_sendfile loop fs o i offset l cb =
+    primIO $ prim__uv_fs_sendfile loop fs o i offset l (\p => toPrim $ cb p)
+
+  ||| Equivalent to access(2) on Unix. Windows uses GetFileAttributesW().
+  export %inline
+  uv_fs_access :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (mode : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_access loop fs path mode cb =
+    primIO $ prim__uv_fs_access loop fs path mode (\p => toPrim $ cb p)
+
+  ||| Equivalent to chmod(2) respectively.
+  export %inline
+  uv_fs_chmod :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (mode : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_chmod loop fs path mode cb =
+    primIO $ prim__uv_fs_chmod loop fs path mode (\p => toPrim $ cb p)
+
+  ||| Equivalent to fchmod(2) respectively.
+  export %inline
+  uv_fs_fchmod :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : Int32)
+    -> (mode : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_fchmod loop fs file mode cb =
+    primIO $ prim__uv_fs_fchmod loop fs file mode (\p => toPrim $ cb p)
+
+  ||| Equivalent to utime(2).
+  export %inline
+  uv_fs_utime :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (atime, mtime : Double)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_utime loop fs path atime mtime cb =
+    primIO $ prim__uv_fs_utime loop fs path atime mtime (\p => toPrim $ cb p)
+
+  ||| Equivalent to futime(2).
+  export %inline
+  uv_fs_futime :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : Int32)
+    -> (atime, mtime : Double)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_futime loop fs file atime mtime cb =
+    primIO $ prim__uv_fs_futime loop fs file atime mtime (\p => toPrim $ cb p)
+
+  ||| Equivalent to lutime(2).
+  export %inline
+  uv_fs_lutime :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (atime, mtime : Double)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_lutime loop fs path atime mtime cb =
+    primIO $ prim__uv_fs_lutime loop fs path atime mtime (\p => toPrim $ cb p)
+
+  ||| Equivalent to link(2).
+  export %inline
+  uv_fs_link :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path, newpath : String)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_link loop fs path newpath cb =
+    primIO $ prim__uv_fs_link loop fs path newpath (\p => toPrim $ cb p)
+
+  ||| Equivalent to symlink(2).
+  |||
+  ||| NOTE:
+  |||    On Windows the flags parameter can be specified to control
+  |||    how the symlink will be created:
+  |||
+  |||    • UV_FS_SYMLINK_DIR: indicates that path points to a directory.
+  |||
+  |||    • UV_FS_SYMLINK_JUNCTION: request that the symlink is
+  |||      created using junction points.
+  export %inline
+  uv_fs_symlink :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path, newpath : String)
+    -> (flags : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_symlink loop fs path newpath flags cb =
+    primIO $ prim__uv_fs_symlink loop fs path newpath flags (\p => toPrim $ cb p)
+
+  ||| Equivalent to readlink(2).  The resulting string is stored in req->ptr.
+  export %inline
+  uv_fs_readlink :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_readlink loop fs path cb =
+    primIO $ prim__uv_fs_readlink loop fs path (\p => toPrim $ cb p)
+
+  ||| Equivalent to realpath(3) on Unix. Windows uses
+  ||| GetFinalPathNameByHandle. The resulting string is stored in req->ptr.
+  |||
+  ||| WARNING:
+  |||    This function has certain platform-specific caveats that
+  |||    were discovered when used in Node.
+  |||
+  |||    • macOS and other BSDs: this function will fail with UV_ELOOP if
+  |||      more than 32 symlinks are found while resolving the given path.
+  |||      This limit is hardcoded and cannot be sidestepped.
+  |||
+  |||    • Windows: while this function works in the common case,
+  |||      there are a number of corner cases where it doesn't:
+  |||
+  |||      • Paths in ramdisk volumes created by tools which sidestep the
+  |||        Volume Manager (such as ImDisk) cannot be resolved.
+  |||
+  |||      • Inconsistent casing when using drive letters.
+  |||
+  |||      • Resolved path bypasses subst'd drives.
+  |||
+  |||    While this function can still be used, it's not recommended
+  |||    if scenarios such as the above need to be supported.
+  export %inline
+  uv_fs_realpath :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_realpath loop fs path cb =
+    primIO $ prim__uv_fs_realpath loop fs path (\p => toPrim $ cb p)
+
+  ||| Equivalent to chown(2).
+  export %inline
+  uv_fs_chown :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (uid, gid : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_chown loop fs path uid gid cb =
+    primIO $ prim__uv_fs_chown loop fs path uid gid (\p => toPrim $ cb p)
+
+  ||| Equivalent to fchown(2).
+  export %inline
+  uv_fs_fchown :
+       Ptr Loop
+    -> Ptr Fs
+    -> (file : String)
+    -> (uid, gid : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_fchown loop fs file uid gid cb =
+    primIO $ prim__uv_fs_lchown loop fs file uid gid (\p => toPrim $ cb p)
+
+  ||| Equivalent to lchown(2).
+  export %inline
+  uv_fs_lchown :
+       Ptr Loop
+    -> Ptr Fs
+    -> (path : String)
+    -> (uid, gid : Int32)
+    -> (cb   : Ptr Fs -> IO ())
+    -> io Int32
+  uv_fs_lchown loop fs path uid gid cb =
+    primIO $ prim__uv_fs_lchown loop fs path uid gid (\p => toPrim $ cb p)

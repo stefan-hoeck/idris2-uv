@@ -117,6 +117,10 @@ uint64_t uv_get_f_files(uv_statfs_t * stat){return stat->f_files;}
 
 uint64_t uv_get_f_ffree(uv_statfs_t * stat){return stat->f_ffree;}
 
+long uv_get_tv_sec(uv_timespec_t time){return time.tv_sec;}
+
+long uv_get_tv_nsec(uv_timespec_t time){return time.tv_nsec;}
+
 int uv_dirent_unknown(){return UV_DIRENT_UNKNOWN;}
 int uv_dirent_file(){return UV_DIRENT_FILE;}
 int uv_dirent_dir(){return UV_DIRENT_DIR;}
