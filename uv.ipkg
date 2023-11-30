@@ -6,6 +6,7 @@ brief   = "Idris2 bindings to libuv"
 depends = base >= 0.6.0
         , elab-util
         , bytestring
+        , finite
 
 modules = System.UV
         , System.UV.DNS
@@ -25,6 +26,7 @@ modules = System.UV
         , System.UV.File
         , System.UV.File.Flags
 
+        , System.UV.Raw.Error
         , System.UV.Raw.File
         , System.UV.Raw.Handle
         , System.UV.Raw.Idle

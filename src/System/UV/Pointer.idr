@@ -13,24 +13,6 @@ import public System.UV.Raw.Pointer
 -- String Conversions
 --------------------------------------------------------------------------------
 
-||| Convert a `Ptr Char` to an Idris string.
-|||
-||| Note: Users must make sure that the given pointer points at a
-||| zero-terminated byte array. As an alternative, consider converting
-||| a `Ptr Bits8`.
-export %inline
-getString : Ptr Char -> String
-getString p = prim__getString (believe_me p)
-
-||| Like `getString` but returns `Nothing` in case the given pointer is the
-||| null pointer.
-export %inline
-getStringMay : Ptr Char -> Maybe String
-getStringMay p =
-  case prim__nullPtr p of
-    0 => Just $ getString p
-    _ => Nothing
-
 ||| Reads `n` bytes of data from the byte array in a `uv_buf_t`
 ||| into an Idris-managed immutable `ByteString`
 export
@@ -52,7 +34,7 @@ fromByteString : HasIO io => ByteString -> io (Ptr Buf)
 fromByteString bs = do
   buf <- liftIO $ toBuffer bs
   ptr <- mallocBuf (cast bs.size)
-  copyFromBuffer buf ptr (cast bs.size) 
+  copyFromBuffer buf ptr (cast bs.size)
   pure ptr
 
 ||| Allocates a `uv_buf_t` to hold the data in the given bytestring.

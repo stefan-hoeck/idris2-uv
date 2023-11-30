@@ -382,7 +382,7 @@ allocBuf cs _ _ buf = initBuf buf cs BufSize
 onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onStreamRead loop stream res buf = do
   if res < 0
-     then when (res /= UV_EOF) (putStrLn "Error: \{uv_strerror res}")
+     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}")
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
 
@@ -404,7 +404,7 @@ streamExample = do
 
 Two new concepts appear in the code example above: Initialization of pipes
 with `uv_pipe_open` and checking for the end of input by comparing
-the reading result with `UV_EOF`. All other concepts have already been
+the reading result with `uv_eof`. All other concepts have already been
 explained before.
 
 In addition, we used streams for the first time. In libuv, TCP sockets,
@@ -521,7 +521,7 @@ echoRead client nread buf =
        dat <- getBufBase buf
        freePtr dat
        uv_close client freePtr
-       when (nread /= UV_EOF) $ do
+       when (nread /= uv_eof) $ do
          putStrLn "Read error \{uv_strerror nread}"
 
 -- main : IO ()
@@ -552,7 +552,7 @@ a server:
 onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onClientRead loop stream res buf = do
   if res < 0
-     then when (res /= UV_EOF) (putStrLn "Error: \{uv_strerror res}") >>
+     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}") >>
           ignore (uv_close stream freePtr)
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
