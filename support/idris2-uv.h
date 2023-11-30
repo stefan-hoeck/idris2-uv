@@ -298,4 +298,3 @@ int uv_enotty();
 int uv_eftype();
 int uv_eilseq();
 int uv_esocktnosupport();
-int uv_eunatch();

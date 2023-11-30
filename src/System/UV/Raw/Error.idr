@@ -245,9 +245,6 @@ uv_eilseq : Int32
 export %foreign (idris_uv "uv_esocktnosupport")
 uv_esocktnosupport : Int32
 
-export %foreign (idris_uv "uv_eunatch")
-uv_eunatch : Int32
-
 %foreign (idris_uv "uv_strerror")
 prim__uv_strerror : Int32 -> Ptr Char
 

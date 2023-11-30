@@ -302,4 +302,3 @@ int uv_enotty(){ return UV_ENOTTY; }
 int uv_eftype(){ return UV_EFTYPE; }
 int uv_eilseq(){ return UV_EILSEQ; }
 int uv_esocktnosupport(){ return UV_ESOCKTNOSUPPORT; }
-int uv_eunatch(){ return UV_EUNATCH; }

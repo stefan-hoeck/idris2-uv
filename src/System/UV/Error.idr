@@ -99,7 +99,6 @@ data UVError : Type where
   UV_EFTYPE          : UVError
   UV_EILSEQ          : UVError
   UV_ESOCKTNOSUPPORT : UVError
-  UV_EUNATCH         : UVError
 
 %runElab derive "UVError" [Show,Eq,Finite]
 
@@ -185,7 +184,6 @@ toCode UV_ENOTTY          = uv_enotty
 toCode UV_EFTYPE          = uv_eftype
 toCode UV_EILSEQ          = uv_eilseq
 toCode UV_ESOCKTNOSUPPORT = uv_esocktnosupport
-toCode UV_EUNATCH         = uv_eunatch
 
 export
 Interpolation UVError where
