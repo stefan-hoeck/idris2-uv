@@ -65,7 +65,9 @@ int uv_get_ai_protocol(struct addrinfo *info) { return info->ai_protocol; }
 
 int uv_get_ai_flags(struct addrinfo *info) { return info->ai_flags; }
 
-struct sockaddr *uv_get_ai_addr(struct addrinfo *info) {return info->ai_addr;}
+struct sockaddr *uv_get_ai_addr(struct addrinfo *info) {
+  return info->ai_addr;
+}
 
 uint64_t uv_get_st_dev(uv_stat_t *stat) { return stat->st_dev; }
 
