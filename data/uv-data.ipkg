@@ -6,7 +6,9 @@ brief   = "Generated constants fir idris2-uv"
 depends = base >= 0.6.0
         , elab-util
 
-modules = System.UV.Data.Error
+modules = System.UV.Data.DNS
+        , System.UV.Data.Error
+        , System.UV.Data.Pointer
         , System.UV.Data.RunMode
 
 sourcedir = "src"

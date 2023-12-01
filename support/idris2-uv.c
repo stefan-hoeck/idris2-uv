@@ -167,25 +167,3 @@ int uv_s_irwxo() { return S_IRWXO; }
 int uv_s_iroth() { return S_IROTH; }
 int uv_s_iwoth() { return S_IWOTH; }
 int uv_s_ixoth() { return S_IXOTH; }
-
-size_t uv_buf_sz() { return sizeof(uv_buf_t); }
-size_t uv_loop_sz() { return sizeof(uv_loop_t); }
-size_t uv_sockaddr_in_sz() { return sizeof(struct sockaddr_in); }
-size_t uv_sockaddr_in6_sz() { return sizeof(struct sockaddr_in6); }
-size_t uv_sockaddr_sz() { return sizeof(struct sockaddr); }
-size_t uv_addrinfo_sz() { return sizeof(struct addrinfo); }
-
-int uv_af_inet() { return AF_INET; }
-int uv_af_inet6() { return AF_INET6; }
-int uv_af_unix() { return AF_UNIX; }
-int uv_af_unspec() { return AF_UNSPEC; }
-int uv_sock_stream() { return SOCK_STREAM; }
-int uv_sock_dgram() { return SOCK_DGRAM; }
-int uv_sock_raw() { return SOCK_RAW; }
-int uv_sock_any() { return 0; }
-int uv_ipproto_ip() { return IPPROTO_IP; }
-int uv_ipproto_ipv6() { return IPPROTO_IPV6; }
-int uv_ipproto_icmp() { return IPPROTO_ICMP; }
-int uv_ipproto_raw() { return IPPROTO_RAW; }
-int uv_ipproto_tcp() { return IPPROTO_TCP; }
-int uv_ipproto_udp() { return IPPROTO_UDP; }

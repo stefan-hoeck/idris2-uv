@@ -1,39 +1,3 @@
-#!/usr/bin/env bash
-
-make -C codegen all
-codegen/error_gen > src/System/UV/Data/Error.idr
-
-cat > src/System/UV/Data/RunMode.idr << EOT
-module System.UV.Data.RunMode
-
-import Derive.Prelude
-
-%language ElabReflection
-%default total
-
-public export
-data RunMode : Type where
-  Default : RunMode
-  Once    : RunMode
-  NoWait  : RunMode
-
-%runElab derive "RunMode" [Show,Eq]
-
-export
-toCode : RunMode -> Bits32
-EOT
-
-codegen/run_mode_gen >> src/System/UV/Data/RunMode.idr
-
-cat > src/System/UV/Data/Pointer.idr << EOT
-module System.UV.Data.Pointer
-
-%default total
-EOT
-
-codegen/size_gen >> src/System/UV/Data/Pointer.idr
-
-cat > src/System/UV/Data/DNS.idr << EOT
 module System.UV.Data.DNS
 
 import Derive.Prelude
@@ -88,6 +52,26 @@ data Protocol : Type where
   IPPROTO_UDP  : Protocol
 
 %runElab derive "Protocol" [Show,Eq]
-EOT
 
-codegen/dns_gen >> src/System/UV/Data/DNS.idr
+public export
+familyCode : SockFamily -> Bits32
+familyCode AF_INET   = 2
+familyCode AF_INET6  = 10
+familyCode AF_UNIX   = 1
+familyCode AF_UNSPEC = 0
+
+public export
+sockCode : SockType -> Bits32
+sockCode Stream = 1
+sockCode Datagram = 2
+sockCode Raw = 3
+sockCode Any = 0
+
+public export
+protocolCode : Protocol -> Bits32
+protocolCode IPPROTO_IP   = 0
+protocolCode IPPROTO_IPV6 = 41
+protocolCode IPPROTO_ICMP = 1
+protocolCode IPPROTO_RAW  = 255
+protocolCode IPPROTO_TCP  = 6
+protocolCode IPPROTO_UDP  = 17

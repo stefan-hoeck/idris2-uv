@@ -6,3 +6,4 @@ support/libuv-idris
 data/codegen/error_gen
 data/codegen/run_mode_gen
 data/codegen/size_gen
+data/codegen/dns_gen
