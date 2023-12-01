@@ -5,3 +5,4 @@ support/idris2-uv.o
 support/libuv-idris
 codegen/error_gen
 codegen/run_mode_gen
+codegen/size_gen

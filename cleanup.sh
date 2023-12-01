@@ -5,5 +5,6 @@ if [ "$(
     echo $?
 )" -eq 0 ]; then
     git restore src/System/UV/Data/Error.idr
+    git restore src/System/UV/Data/Pointer.idr
     git restore src/System/UV/Data/RunMode.idr
 fi

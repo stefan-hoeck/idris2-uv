@@ -211,8 +211,3 @@ int uv_ipproto_icmp();
 int uv_ipproto_raw();
 int uv_ipproto_tcp();
 int uv_ipproto_udp();
-
-// Run modes
-int uv_run_default();
-int uv_run_once();
-int uv_run_nowait();

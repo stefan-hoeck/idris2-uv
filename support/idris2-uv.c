@@ -216,7 +216,3 @@ int uv_ipproto_icmp() { return IPPROTO_ICMP; }
 int uv_ipproto_raw() { return IPPROTO_RAW; }
 int uv_ipproto_tcp() { return IPPROTO_TCP; }
 int uv_ipproto_udp() { return IPPROTO_UDP; }
-
-int uv_run_default() { return UV_RUN_DEFAULT; }
-int uv_run_once() { return UV_RUN_ONCE; }
-int uv_run_nowait() { return UV_RUN_NOWAIT; }
