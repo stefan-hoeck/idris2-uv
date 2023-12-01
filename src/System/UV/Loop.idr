@@ -29,7 +29,7 @@ defaultLoop = MkLoop <$> uv_default_loop
 ||| a covering action.
 covering export %inline
 runLoop : UVLoop -> UVIO ()
-runLoop l = uvio $ uv_run l.loop 0
+runLoop l = uvio $ uv_run l.loop (toCode Default)
 
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.
