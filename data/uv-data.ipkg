@@ -1,9 +1,10 @@
-package uv
+package uv-data
 version = 0.1.0
 authors = "stefan-hoeck"
 brief   = "Generated constants fir idris2-uv"
 
 depends = base >= 0.6.0
+        , elab-util
 
 modules = System.UV.Data.Error
         , System.UV.Data.RunMode
