@@ -1,3 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-git restore src/System/UV/Data/Error.idr
+if [ "$(
+    git status >/dev/null 2>&1
+    echo $?
+)" -eq 0 ]; then
+  git restore src/System/UV/Data/Error.idr
+fi
