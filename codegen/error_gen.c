@@ -36,4 +36,8 @@ int main(void) {
   printf("\nexport %%inline\n");
   printf("errorMsg : UVError -> String\n");
   printf("errorMsg = uv_strerror . toCode\n");
+
+  printf("\nexport %%inline\n");
+  printf("Interpolation UVError where\n");
+  printf("  interpolate err = \"\{errorMsg err} (\{show err})\"\n");
 }

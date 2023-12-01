@@ -250,7 +250,7 @@ onOpen loop openFS = do
   -- checking result: < 0 means an error occured, otherwise, it's a
   -- file handle
   if res < 0
-     then putStrLn "Error when reading: \{uv_strerror res}"
+     then putStrLn "Error when reading: \{errorMsg $ fromCode res}"
      else do
        putStrLn "File opened successfully for reading"
        -- allocating the `uv_fs_t` for reading
@@ -271,7 +271,8 @@ everything works under the hood.
 We first note, that the result of the file opening request is stored in
 the request's `result` field: This is an integer that's either a file
 handle or an error code (if the value is less than zero). In case of
-an error, we can get a proper error message with `uv_strerror`. If all
+an error, we can get a proper error message by converting the result
+to an `UVError` first. If all
 goes well, we have to issue a new asynchronous request. For this, we allocate
 another request pointer (`readFS`). We also need to allocate a byte
 array where the data read from the file can be stored: We allocate
@@ -295,7 +296,7 @@ onRead loop buf file readFS = do
   freePtr readFS
 
   if res < 0
-     then putStrLn "Error opening file: \{uv_strerror res}"
+     then putStrLn "Error opening file: \{errorMsg $ fromCode res}"
      else do
        putStrLn "Read \{show res} bytes of data\n"
        fsWrite <- mallocPtr Fs
@@ -382,7 +383,7 @@ allocBuf cs _ _ buf = initBuf buf cs BufSize
 onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onStreamRead loop stream res buf = do
   if res < 0
-     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}")
+     then when (fromCode res /= EOF) (putStrLn "Error: \{errorMsg $ fromCode res}")
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
 
@@ -444,7 +445,7 @@ echoWrite : Ptr Buf -> Ptr Write -> Int32 -> IO ()
 echoWrite buf req status = do
   freePtr buf
   freePtr req
-  when (status < 0) (putStrLn "Write error \{uv_strerror status}")
+  when (status < 0) (putStrLn "Write error \{errorMsg $ fromCode status}")
 
 stopEcho : Ptr Tcp -> Ptr Signal -> Int32 -> IO ()
 stopEcho server _ sig = do
@@ -473,7 +474,7 @@ echoExample = do
   _      <- uv_unref kill
   _      <- uv_signal_start kill (stopEcho server) uv_sigint
 
-  when (r < 0) (die "Listen error: \{uv_strerror r}")
+  when (r < 0) (die "Listen error: \{errorMsg $ fromCode r}")
   _      <- uv_run loop UV_RUN_DEFAULT
 
   freePtr server
@@ -491,7 +492,7 @@ Let's implement `onNewConnection` next:
 ```idris
 onNewConnection loop server status =
   if status < 0
-     then putStrLn "New connection error \{uv_strerror status}"
+     then putStrLn "New connection error \{errorMsg $ fromCode status}"
      else do
        putStrLn "Got a new connection."
        client <- mallocPtr Tcp
@@ -521,8 +522,8 @@ echoRead client nread buf =
        dat <- getBufBase buf
        freePtr dat
        uv_close client freePtr
-       when (nread /= uv_eof) $ do
-         putStrLn "Read error \{uv_strerror nread}"
+       when (fromCode nread /= EOF) $ do
+         putStrLn "Read error \{errorMsg $ fromCode nread}"
 
 -- main : IO ()
 -- main = echoExample
@@ -552,7 +553,8 @@ a server:
 onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onClientRead loop stream res buf = do
   if res < 0
-     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}") >>
+     then when (fromCode res /= EOF)
+            (putStrLn "Error: \{errorMsg $ fromCode res}") >>
           ignore (uv_close stream freePtr)
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
@@ -568,7 +570,7 @@ onClientConnect : Ptr Loop -> Ptr Tcp -> Ptr Connect -> Int32 -> IO ()
 onClientConnect loop client connect status = do
   freePtr connect
   if status < 0
-     then putStrLn "New connection error: \{uv_strerror status}"
+     then putStrLn "New connection error: \{errorMsg $ fromCode status}"
      else do
        putStrLn "Got a new connection."
        req  <- mallocPtr Write
@@ -590,7 +592,7 @@ clientExample = do
   connect <- mallocPtr Connect
   r       <- uv_tcp_connect connect socket addr (onClientConnect loop socket)
 
-  when (r < 0) (die "Connect error: \{uv_strerror r}")
+  when (r < 0) (die "Connect error: \{errorMsg $ fromCode r}")
   _      <- uv_run loop UV_RUN_DEFAULT
 
   freePtr addr

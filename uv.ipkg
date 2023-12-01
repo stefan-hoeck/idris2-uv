@@ -23,10 +23,12 @@ modules = System.UV
         , System.UV.Timer
         , System.UV.Util
 
+        , System.UV.Data.Error
+
         , System.UV.File
         , System.UV.File.Flags
 
-        , System.UV.Raw.Error
+
         , System.UV.Raw.File
         , System.UV.Raw.Handle
         , System.UV.Raw.Idle
