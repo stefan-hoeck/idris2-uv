@@ -10,12 +10,22 @@ import public System.UV.Raw.Handle
 
 ||| Closes the given `uv_handle_t` and releases the memory allocated for it.
 export %inline
-releaseHandle : 
+releaseHandle :
      {auto has   : HasIO io}
   -> {auto 0 prf : PCast t Handle}
   -> Ptr t
   -> io ()
 releaseHandle p = uv_close p $ freePtr
+
+||| Release the given handle if the given IO action returns `False`.
+export %inline
+releaseOnFalse :
+     {auto has   : HasIO io}
+  -> {auto 0 prf : PCast t Handle}
+  -> io Bool
+  -> Ptr t
+  -> io ()
+releaseOnFalse act p = act >>= \b => when b (releaseHandle p)
 
 ||| Manage a `uv_handle_t` as a resource that can be released.
 |||
@@ -23,7 +33,7 @@ releaseHandle p = uv_close p $ freePtr
 ||| will be closed by calling `uv_close` and release from memory
 ||| in the callback passed to `uv_close`.
 export %inline
-manageHandle : 
+manageHandle :
      {auto has   : HasIO io}
   -> {auto 0 prf : PCast t Handle}
   -> Ptr t

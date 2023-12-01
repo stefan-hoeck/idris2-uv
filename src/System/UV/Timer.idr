@@ -9,43 +9,40 @@ import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Resource
 import public System.UV.Raw.Timer
 
 %default total
 
-||| Invokes the given IO action every `repeat` milliseconds, the first time
-||| after `timeout` has passed.
-|||
-||| Execution can be stopped whenever the returned `Resource` is released.
-||| The release handle is also passed to the callback, so that execution can
-||| be stopped from there as well.
-export
-timer :
-     {auto l : UVLoop}
-  -> (timeout,repeat : Bits64)
-  -> (Resource -> IO ())
-  -> UVIO Resource 
-timer t r act = do
-  h   <- mallocPtr Timer
-  uvio $ uv_timer_init l.loop h
-  res <- manageHandle h
-  uvio $ uv_timer_start h (\_ => act res) t r
-  pure res
+parameters {auto l : UVLoop}
+           (timeout : Bits64)
 
-||| Invokes the given IO action every `repeat` milliseconds, the first time
-||| after `timeout` has passed.
-|||
-||| Execution can be stopped whenever the returned `Resource` is released.
-export %inline
-repeatedly : (l : UVLoop) => (timeout,repeat : Bits64) -> IO () -> UVIO Resource 
-repeatedly t r = timer t r . const
+  ||| Invokes the given IO action every `repeat` milliseconds, the first time
+  ||| after `timeout` has passed.
+  |||
+  ||| Execution will be stopped when the I/O action returns `False`.
+  |||
+  ||| If `reference` is set to `False`, the timer handle will not be
+  ||| referenced at the event loop: The loop will terminate, if there
+  ||| only unreferenced handles left.
+  export
+  timer : (repeat : Bits64) -> (reference : Bool) -> IO Bool -> UVIO ()
+  timer r ref act = do
+    h   <- mallocPtr Timer
+    uvio $ uv_timer_init l.loop h
+    when (not ref) (uv_unref h)
+    uvio $ uv_timer_start h (releaseOnFalse act) timeout r
 
-||| Invokes the given IO action after `timeout` milliseconds.
-|||
-||| Execution can be aborted whenever the returned `Resource` is released.
-||| Note: All resources are freed automatically
-|||       after the IO action has been resolved.
-export %inline
-delayed : (l : UVLoop) => (timeout : Bits64) -> IO () -> UVIO Resource 
-delayed t act = timer t 0 (\res => act >> release res)
+  ||| Invokes the given IO action every `repeat` milliseconds, the first time
+  ||| after `timeout` has passed.
+  |||
+  ||| See `timer` for an explanation of the `reference` argument.
+  export %inline
+  repeatedly : (repeat : Bits64) -> (reference : Bool) -> IO () -> UVIO ()
+  repeatedly r ref = timer r ref . ($> True)
+
+  ||| Invokes the given IO action once after `timeout` milliseconds.
+  |||
+  ||| See `timer` for an explanation of the `reference` argument.
+  export %inline
+  delayed : (timeout : Bits64) -> (reference : Bool) -> IO () -> UVIO ()
+  delayed t ref = timer 0 ref . ($> False)
