@@ -168,33 +168,6 @@ int uv_s_iroth() { return S_IROTH; }
 int uv_s_iwoth() { return S_IWOTH; }
 int uv_s_ixoth() { return S_IXOTH; }
 
-size_t uv_async_sz() { return uv_handle_size(UV_ASYNC); }
-size_t uv_check_sz() { return uv_handle_size(UV_CHECK); }
-size_t uv_fs_event_sz() { return uv_handle_size(UV_FS_EVENT); }
-size_t uv_fs_poll_sz() { return uv_handle_size(UV_FS_POLL); }
-size_t uv_handle_sz() { return uv_handle_size(UV_HANDLE); }
-size_t uv_idle_sz() { return uv_handle_size(UV_IDLE); }
-size_t uv_named_pipe_sz() { return uv_handle_size(UV_NAMED_PIPE); }
-size_t uv_poll_sz() { return uv_handle_size(UV_POLL); }
-size_t uv_prepare_sz() { return uv_handle_size(UV_PREPARE); }
-size_t uv_process_sz() { return uv_handle_size(UV_PROCESS); }
-size_t uv_stream_sz() { return uv_handle_size(UV_STREAM); }
-size_t uv_tcp_sz() { return uv_handle_size(UV_TCP); }
-size_t uv_timer_sz() { return uv_handle_size(UV_TIMER); }
-size_t uv_tty_sz() { return uv_handle_size(UV_TTY); }
-size_t uv_udp_sz() { return uv_handle_size(UV_UDP); }
-size_t uv_signal_sz() { return uv_handle_size(UV_SIGNAL); }
-
-size_t uv_req_sz() { return uv_req_size(UV_REQ); }
-size_t uv_connect_sz() { return uv_req_size(UV_CONNECT); }
-size_t uv_write_sz() { return uv_req_size(UV_WRITE); }
-size_t uv_shutdown_sz() { return uv_req_size(UV_SHUTDOWN); }
-size_t uv_udp_send_sz() { return uv_req_size(UV_UDP_SEND); }
-size_t uv_fs_sz() { return uv_req_size(UV_FS); }
-size_t uv_work_sz() { return uv_req_size(UV_WORK); }
-size_t uv_getaddrinfo_sz() { return uv_req_size(UV_GETADDRINFO); }
-size_t uv_getnameinfo_sz() { return uv_req_size(UV_GETNAMEINFO); }
-
 size_t uv_buf_sz() { return sizeof(uv_buf_t); }
 size_t uv_loop_sz() { return sizeof(uv_loop_t); }
 size_t uv_sockaddr_in_sz() { return sizeof(struct sockaddr_in); }
