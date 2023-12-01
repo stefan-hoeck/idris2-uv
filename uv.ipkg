@@ -23,6 +23,7 @@ modules = System.UV
         , System.UV.Util
 
         , System.UV.Data.Error
+        , System.UV.Data.RunMode
 
         , System.UV.File
         , System.UV.File.Flags

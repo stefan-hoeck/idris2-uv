@@ -3,6 +3,8 @@ version = 0.1.0
 authors = "stefan-hoeck"
 depends = uv
         , hedgehog
+        , finite
+
 main = Main
 executable = "uv-test"
 sourcedir = "src"

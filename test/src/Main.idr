@@ -2,11 +2,7 @@ module Main
 
 import Flags
 import Hedgehog
-import Pointer
-import Timer
+import System.UV
 
 main : IO ()
-main = do
-  Timer.main
-  Pointer.run
-  test [ Flags.props ]
+main = test [ Flags.props ]

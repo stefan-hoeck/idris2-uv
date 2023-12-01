@@ -10,7 +10,12 @@ else
  LDFLAGS += -fuse-ld=gold
 endif
 
+all: error_gen run_mode_gen
 
 .PHONY: error_gen
 error_gen:
 	$(CC) $(LDFLAGS) -o error_gen error_gen.c
+
+.PHONY: run_mode_gen
+run_mode_gen:
+	$(CC) $(LDFLAGS) -o run_mode_gen run_mode_gen.c

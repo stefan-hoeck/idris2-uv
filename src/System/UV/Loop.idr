@@ -1,11 +1,13 @@
 module System.UV.Loop
 
-import public Control.Monad.Either
 import Data.IORef
 import System
 import System.UV.Error
-import System.UV.Raw.Pointer
 import System.UV.Raw.Loop
+import System.UV.Raw.Pointer
+
+import public Control.Monad.Either
+import public System.UV.Data.RunMode
 
 %default total
 

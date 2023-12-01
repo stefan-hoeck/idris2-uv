@@ -16,3 +16,6 @@ toCode : UVError -> Int32
 
 export
 fromCode : Int32 -> UVError
+
+export
+Interpolation UVError where interpolate = show
