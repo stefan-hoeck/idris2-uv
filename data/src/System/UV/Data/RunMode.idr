@@ -18,3 +18,6 @@ toCode : RunMode -> Bits32
 toCode Default = 0
 toCode Once = 1
 toCode NoWait = 2
+toCode Default = 0
+toCode Once = 1
+toCode NoWait = 2

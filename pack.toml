@@ -4,6 +4,11 @@ path = "."
 ipkg = "uv.ipkg"
 test = "test/test.ipkg"
 
+[custom.all.uv-data]
+type = "local"
+path = "data"
+ipkg = "uv-data.ipkg"
+
 [custom.all.uv-test]
 type = "local"
 path = "test"
