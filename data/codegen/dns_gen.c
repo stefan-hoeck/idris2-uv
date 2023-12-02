@@ -4,7 +4,6 @@
 #include <uv.h>
 
 int main(void) {
-
   printf("\npublic export\nfamilyCode : SockFamily -> Bits32\n");
   printf("familyCode AF_INET   = %d\n", AF_INET);
   printf("familyCode AF_INET6  = %d\n", AF_INET6);

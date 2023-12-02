@@ -43,5 +43,5 @@ int main(void) {
 
   printf("\nexport %%inline\n");
   printf("Interpolation UVError where\n");
-  printf("  interpolate err = \"\{errorMsg err} (\{show err})\"\n");
+  printf("  interpolate err = \"{errorMsg err} ({show err})\"\n");
 }
