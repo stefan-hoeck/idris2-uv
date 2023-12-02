@@ -5,6 +5,8 @@ import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
 
+import public System.UV.Data.File
+
 %default total
 
 export
@@ -101,30 +103,6 @@ tv_sec : UV_Timespec_T -> Int64
 
 export %foreign (idris_uv "uv_get_tv_nsec")
 tv_nsec : UV_Timespec_T -> Int64
-
-export %foreign (idris_uv "uv_dirent_unknown")
-UV_DIRENT_UNKNOWN : Int32
-
-export %foreign (idris_uv "uv_dirent_file")
-UV_DIRENT_FILE : Int32
-
-export %foreign (idris_uv "uv_dirent_dir")
-UV_DIRENT_DIR : Int32
-
-export %foreign (idris_uv "uv_dirent_link")
-UV_DIRENT_LINK : Int32
-
-export %foreign (idris_uv "uv_dirent_fifo")
-UV_DIRENT_FIFO : Int32
-
-export %foreign (idris_uv "uv_dirent_socket")
-UV_DIRENT_SOCKET : Int32
-
-export %foreign (idris_uv "uv_dirent_char")
-UV_DIRENT_CHAR : Int32
-
-export %foreign (idris_uv "uv_dirent_block")
-UV_DIRENT_BLOCK : Int32
 
 export %foreign (idris_uv "uv_fs_get_result")
 prim__uv_fs_get_result : Ptr Fs -> PrimIO Int32

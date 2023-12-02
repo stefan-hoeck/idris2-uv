@@ -9,7 +9,6 @@ import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Util
 
-import public System.UV.File.Flags
 import public System.UV.Raw.File
 
 %default total

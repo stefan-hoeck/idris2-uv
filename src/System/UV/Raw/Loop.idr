@@ -3,6 +3,8 @@ module System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
 
+import public System.UV.Data.RunMode
+
 %default total
 
 --------------------------------------------------------------------------------

@@ -48,7 +48,7 @@ loopExample : IO ()
 loopExample = do
   loop     <- mallocPtr Loop
   resInit  <- uv_loop_init loop
-  resRun   <- uv_run loop UV_RUN_DEFAULT
+  resRun   <- uv_run loop (toCode Default)
   resClose <- uv_loop_close loop
   freePtr loop
 ```
@@ -89,7 +89,7 @@ code:
 defaultLoopExample : IO ()
 defaultLoopExample = do
   loop     <- uv_default_loop
-  resRun   <- uv_run loop UV_RUN_DEFAULT
+  resRun   <- uv_run loop (toCode Default)
   resClose <- uv_loop_close loop
   pure ()
 ```
@@ -123,7 +123,7 @@ idleExample = do
   _        <- uv_idle_init loop handle
   ref      <- newIORef 0
   _        <- uv_idle_start handle (checkCounter 100_000 ref)
-  _        <- uv_run loop UV_RUN_DEFAULT
+  _        <- uv_run loop (toCode Default)
   _        <- uv_loop_close loop
   freePtr handle
 
@@ -173,7 +173,7 @@ signalExample = do
   _          <- uv_signal_start killSwitch (stop idler) uv_sigint
 
   -- running the app
-  _          <- uv_run loop UV_RUN_DEFAULT
+  _          <- uv_run loop (toCode Default)
 
   -- cleaning up
   _          <- uv_loop_close loop
@@ -218,14 +218,14 @@ onOpen : Ptr Loop -> Ptr Fs -> IO ()
 catFile : Ptr Loop -> String -> IO Int32
 catFile loop path = do
   openFS <- mallocPtr Fs
-  uv_fs_open loop openFS path uv_rdonly 0 (onOpen loop)
+  uv_fs_open loop openFS path (flags RDONLY) 0 (onOpen loop)
 
 fileExample : IO ()
 fileExample = do
   (_::p::_) <- getArgs | _ => die "Invalid number of arguments"
   loop <- uv_default_loop
   _    <- catFile loop p
-  _    <- uv_run loop UV_RUN_DEFAULT
+  _    <- uv_run loop (toCode Default)
   ignore $ uv_loop_close loop
 
 -- main : IO ()
@@ -346,7 +346,7 @@ fileExample2 = do
   _     <- uv_unref idler
 
   _     <- catFile loop p
-  _     <- uv_run loop UV_RUN_DEFAULT
+  _     <- uv_run loop (toCode Default)
   _     <- uv_loop_close loop
   freePtr idler
 
@@ -396,7 +396,7 @@ streamExample = do
   r    <- uv_pipe_open pipe 0
   cs   <- mallocPtrs Bits8 BufSize
   _    <- uv_read_start pipe (allocBuf cs) (onStreamRead loop)
-  _    <- uv_run loop UV_RUN_DEFAULT
+  _    <- uv_run loop (toCode Default)
   ignore $ uv_loop_close loop
 
 -- main : IO ()
@@ -475,7 +475,7 @@ echoExample = do
   _      <- uv_signal_start kill (stopEcho server) uv_sigint
 
   when (r < 0) (die "Listen error: \{errorMsg $ fromCode r}")
-  _      <- uv_run loop UV_RUN_DEFAULT
+  _      <- uv_run loop (toCode Default)
 
   freePtr server
   freePtr addr
@@ -593,7 +593,7 @@ clientExample = do
   r       <- uv_tcp_connect connect socket addr (onClientConnect loop socket)
 
   when (r < 0) (die "Connect error: \{errorMsg $ fromCode r}")
-  _      <- uv_run loop UV_RUN_DEFAULT
+  _      <- uv_run loop (toCode Default)
 
   freePtr addr
 
