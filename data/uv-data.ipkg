@@ -8,6 +8,7 @@ depends = base >= 0.6.0
 
 modules = System.UV.Data.DNS
         , System.UV.Data.Error
+        , System.UV.Data.File
         , System.UV.Data.Pointer
         , System.UV.Data.RunMode
 

@@ -105,23 +105,6 @@ int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
 
-// dirent type
-int uv_dirent_unknown();
-
-int uv_dirent_file();
-
-int uv_dirent_dir();
-
-int uv_dirent_link();
-
-int uv_dirent_fifo();
-
-int uv_dirent_socket();
-
-int uv_dirent_char();
-
-int uv_dirent_block();
-
 // Signal Codes
 int uv_sigabrt();
 int uv_sigfpe();
@@ -133,24 +116,3 @@ int uv_sigsegv();
 int uv_sigtrap();
 int uv_sigusr1();
 int uv_sigusr2();
-
-// File opening flags
-int uv_rdonly();
-int uv_wronly();
-int uv_rdwr();
-int uv_append();
-int uv_creat();
-
-// File creation modes
-int uv_s_irwxu();
-int uv_s_irusr();
-int uv_s_iwusr();
-int uv_s_ixusr();
-int uv_s_irwxg();
-int uv_s_irgrp();
-int uv_s_iwgrp();
-int uv_s_ixgrp();
-int uv_s_irwxo();
-int uv_s_iroth();
-int uv_s_iwoth();
-int uv_s_ixoth();

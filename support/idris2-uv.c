@@ -129,15 +129,6 @@ int64_t uv_get_tv_sec(uv_timespec_t time) { return time.tv_sec; }
 
 int64_t uv_get_tv_nsec(uv_timespec_t time) { return time.tv_nsec; }
 
-int uv_dirent_unknown() { return UV_DIRENT_UNKNOWN; }
-int uv_dirent_file() { return UV_DIRENT_FILE; }
-int uv_dirent_dir() { return UV_DIRENT_DIR; }
-int uv_dirent_link() { return UV_DIRENT_LINK; }
-int uv_dirent_fifo() { return UV_DIRENT_FIFO; }
-int uv_dirent_socket() { return UV_DIRENT_SOCKET; }
-int uv_dirent_char() { return UV_DIRENT_CHAR; }
-int uv_dirent_block() { return UV_DIRENT_BLOCK; }
-
 int uv_sigabrt() { return SIGABRT; }
 int uv_sigfpe() { return SIGFPE; }
 int uv_sighup() { return SIGHUP; }
