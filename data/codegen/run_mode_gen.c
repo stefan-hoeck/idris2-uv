@@ -1,3 +1,5 @@
+// Copyright Stefan Höck
+
 #include <stdio.h>
 #include <uv.h>
 
