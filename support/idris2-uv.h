@@ -104,15 +104,3 @@ uint64_t uv_get_f_ffree(uv_statfs_t *stat);
 int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
-
-// Signal Codes
-int uv_sigabrt();
-int uv_sigfpe();
-int uv_sighup();
-int uv_sigill();
-int uv_sigint();
-int uv_sigquit();
-int uv_sigsegv();
-int uv_sigtrap();
-int uv_sigusr1();
-int uv_sigusr2();

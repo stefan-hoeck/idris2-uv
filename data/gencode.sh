@@ -145,3 +145,30 @@ Monoid File.Mode where
 EOT
 
 codegen/file_gen >>src/System/UV/Data/File.idr
+
+cat >src/System/UV/Data/Signal.idr << EOT
+module System.UV.Data.Signal
+
+import Derive.Prelude
+
+%language ElabReflection
+%default total
+
+||| Signalcodes we can react on.
+public export
+data SigCode : Type where
+  SIGABRT : SigCode
+  SIGFPE  : SigCode
+  SIGHUP  : SigCode
+  SIGILL  : SigCode
+  SIGINT  : SigCode
+  SIGQUIT : SigCode
+  SIGSEGV : SigCode
+  SIGTRAP : SigCode
+  SIGUSR1 : SigCode
+  SIGUSR2 : SigCode
+
+%runElab derive "SigCode" [Show,Eq]
+EOT
+
+codegen/sig_gen >>src/System/UV/Data/Signal.idr

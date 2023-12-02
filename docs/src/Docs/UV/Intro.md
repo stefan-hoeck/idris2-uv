@@ -150,7 +150,7 @@ the upper bound of the counter. In addition, we add a handle to catch
 the app:
 
 ```idris
-stop : Ptr Idle -> Ptr Signal -> Int32 -> IO ()
+stop : Ptr Idle -> Ptr Signal -> Bits32 -> IO ()
 stop idl _ sig = do
   putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
   ignore $ uv_idle_stop idl
@@ -170,7 +170,7 @@ signalExample = do
   killSwitch <- mallocPtr Signal
   _          <- uv_signal_init loop killSwitch
   _          <- uv_unref killSwitch
-  _          <- uv_signal_start killSwitch (stop idler) uv_sigint
+  _          <- uv_signal_start killSwitch (stop idler) (sigToCode SIGINT)
 
   -- running the app
   _          <- uv_run loop (toCode Default)
@@ -447,7 +447,7 @@ echoWrite buf req status = do
   freePtr req
   when (status < 0) (putStrLn "Write error \{errorMsg $ fromCode status}")
 
-stopEcho : Ptr Tcp -> Ptr Signal -> Int32 -> IO ()
+stopEcho : Ptr Tcp -> Ptr Signal -> Bits32 -> IO ()
 stopEcho server _ sig = do
   putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
   ignore $ uv_close_sync server
@@ -472,7 +472,7 @@ echoExample = do
   kill   <- mallocPtr Signal
   _      <- uv_signal_init loop kill
   _      <- uv_unref kill
-  _      <- uv_signal_start kill (stopEcho server) uv_sigint
+  _      <- uv_signal_start kill (stopEcho server) (sigToCode SIGINT)
 
   when (r < 0) (die "Listen error: \{errorMsg $ fromCode r}")
   _      <- uv_run loop (toCode Default)

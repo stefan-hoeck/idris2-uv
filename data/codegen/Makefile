@@ -10,7 +10,11 @@ else
 	LDFLAGS += -fuse-ld=gold
 endif
 
-all: error_gen run_mode_gen size_gen dns_gen file_gen
+all: error_gen run_mode_gen size_gen dns_gen file_gen sig_gen
+
+.PHONY: sig_gen
+sig_gen:
+	$(CC) $(LDFLAGS) -o sig_gen sig_gen.c
 
 .PHONY: file_gen
 file_gen:

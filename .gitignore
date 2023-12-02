@@ -8,3 +8,4 @@ data/codegen/run_mode_gen
 data/codegen/size_gen
 data/codegen/dns_gen
 data/codegen/file_gen
+data/codegen/sig_gen

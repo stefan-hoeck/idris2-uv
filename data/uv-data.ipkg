@@ -11,6 +11,7 @@ modules = System.UV.Data.DNS
         , System.UV.Data.File
         , System.UV.Data.Pointer
         , System.UV.Data.RunMode
+        , System.UV.Data.Signal
 
 sourcedir = "src"
 

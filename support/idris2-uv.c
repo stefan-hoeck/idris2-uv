@@ -128,14 +128,3 @@ uint64_t uv_get_f_ffree(uv_statfs_t *stat) { return stat->f_ffree; }
 int64_t uv_get_tv_sec(uv_timespec_t time) { return time.tv_sec; }
 
 int64_t uv_get_tv_nsec(uv_timespec_t time) { return time.tv_nsec; }
-
-int uv_sigabrt() { return SIGABRT; }
-int uv_sigfpe() { return SIGFPE; }
-int uv_sighup() { return SIGHUP; }
-int uv_sigill() { return SIGILL; }
-int uv_sigint() { return SIGINT; }
-int uv_sigquit() { return SIGQUIT; }
-int uv_sigsegv() { return SIGSEGV; }
-int uv_sigtrap() { return SIGTRAP; }
-int uv_sigusr1() { return SIGUSR1; }
-int uv_sigusr2() { return SIGUSR2; }
