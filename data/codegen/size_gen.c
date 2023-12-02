@@ -6,12 +6,18 @@
 #include <uv.h>
 
 int main(void) {
-  #define XX(code, tpe) printf("\npublic export %%inline\nSZ_" #code " : Bits32\nSZ_" #code " = %zd\n", uv_handle_size(UV_ ## code));
+#define XX(code, tpe)                                                          \
+  printf("\npublic export %%inline\nSZ_" #code " : Bits32\nSZ_" #code          \
+         " = %zd\n",                                                           \
+         uv_handle_size(UV_##code));
   UV_HANDLE_TYPE_MAP(XX)
-  #undef XX
-  #define XX(code, tpe) printf("\npublic export %%inline\nSZ_" #code " : Bits32\nSZ_" #code " = %zd\n", uv_req_size(UV_ ## code));
+#undef XX
+#define XX(code, tpe)                                                          \
+  printf("\npublic export %%inline\nSZ_" #code " : Bits32\nSZ_" #code          \
+         " = %zd\n",                                                           \
+         uv_req_size(UV_##code));
   UV_REQ_TYPE_MAP(XX)
-  #undef XX
+#undef XX
 
   printf("\npublic export %%inline\n");
   printf("SZ_BUF : Bits32\n");
@@ -37,4 +43,3 @@ int main(void) {
   printf("SZ_ADDRINFO : Bits32\n");
   printf("SZ_ADDRINFO = %zd\n", sizeof(struct addrinfo));
 }
-

@@ -25,4 +25,3 @@ int main(void) {
   printf("protocolCode IPPROTO_TCP  = %d\n", IPPROTO_TCP);
   printf("protocolCode IPPROTO_UDP  = %d\n", IPPROTO_UDP);
 }
-

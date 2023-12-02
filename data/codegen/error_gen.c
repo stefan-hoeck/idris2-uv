@@ -13,23 +13,25 @@ int main(void) {
 
   printf("public export\n");
   printf("data UVError : Type where\n");
-  #define XX(code, _) printf("  %s : UVError\n", uv_err_name(UV_ ## code));
+#define XX(code, _) printf("  %s : UVError\n", uv_err_name(UV_##code));
   UV_ERRNO_MAP(XX)
-  #undef XX
+#undef XX
 
   printf("\n%%runElab derive \"UVError\" [Show,Eq]\n");
 
   printf("\nexport\n");
   printf("toCode : UVError -> Int32\n");
-  #define XX(code, _) printf("toCode %s = (%d)\n", uv_err_name(UV_ ## code), UV_ ## code);
+#define XX(code, _)                                                            \
+  printf("toCode %s = (%d)\n", uv_err_name(UV_##code), UV_##code);
   UV_ERRNO_MAP(XX)
-  #undef XX
+#undef XX
 
   printf("\nexport\n");
   printf("fromCode : Int32 -> UVError\n");
-  #define XX(code, _) printf("fromCode (%d) = %s\n", UV_ ## code, uv_err_name(UV_ ## code));
+#define XX(code, _)                                                            \
+  printf("fromCode (%d) = %s\n", UV_##code, uv_err_name(UV_##code));
   UV_ERRNO_MAP(XX)
-  #undef XX
+#undef XX
   printf("fromCode _ = UNKNOWN\n");
 
   printf("\n%%foreign \"C:uv_strerror,libuv-idris\"\n");

@@ -19,13 +19,13 @@ int main(void) {
   printf("direntCode DirentBlock   = %d\n", UV_DIRENT_BLOCK);
 
   printf("\npublic export\ndirentFromCode : Bits32 -> DirentType\n");
-  printf("direntFromCode %d = DirentFile\n",   UV_DIRENT_FILE);
-  printf("direntFromCode %d = DirentDir\n",    UV_DIRENT_DIR);
-  printf("direntFromCode %d = DirentLink\n",   UV_DIRENT_LINK);
-  printf("direntFromCode %d = DirentFifo\n",   UV_DIRENT_FIFO);
+  printf("direntFromCode %d = DirentFile\n", UV_DIRENT_FILE);
+  printf("direntFromCode %d = DirentDir\n", UV_DIRENT_DIR);
+  printf("direntFromCode %d = DirentLink\n", UV_DIRENT_LINK);
+  printf("direntFromCode %d = DirentFifo\n", UV_DIRENT_FIFO);
   printf("direntFromCode %d = DirentSocket\n", UV_DIRENT_SOCKET);
-  printf("direntFromCode %d = DirentChar\n",   UV_DIRENT_CHAR);
-  printf("direntFromCode %d = DirentBlock\n",  UV_DIRENT_BLOCK);
+  printf("direntFromCode %d = DirentChar\n", UV_DIRENT_CHAR);
+  printf("direntFromCode %d = DirentBlock\n", UV_DIRENT_BLOCK);
   printf("direntFromCode _ = DirentUnknown\n");
 
   fileFlag("APPEND", UV_FS_O_APPEND);
@@ -61,14 +61,14 @@ int main(void) {
   mode("XOTH", S_IXOTH);
 }
 
-void fileFlag(char *name, int flag){
-    printf("\nexport %%inline\n");
-    printf("%s : Flags\n", name);
-    printf("%s = %d\n", name, flag);
+void fileFlag(char *name, int flag) {
+  printf("\nexport %%inline\n");
+  printf("%s : Flags\n", name);
+  printf("%s = %d\n", name, flag);
 }
 
-void mode(char *name, int flag){
-    printf("\nexport %%inline\n");
-    printf("%s : File.Mode\n", name);
-    printf("%s = %d\n", name, flag);
+void mode(char *name, int flag) {
+  printf("\nexport %%inline\n");
+  printf("%s : File.Mode\n", name);
+  printf("%s = %d\n", name, flag);
 }
