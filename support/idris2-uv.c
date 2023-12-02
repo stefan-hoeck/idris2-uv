@@ -139,22 +139,3 @@ int uv_sigsegv() { return SIGSEGV; }
 int uv_sigtrap() { return SIGTRAP; }
 int uv_sigusr1() { return SIGUSR1; }
 int uv_sigusr2() { return SIGUSR2; }
-
-int uv_rdonly() { return O_RDONLY; }
-int uv_wronly() { return O_WRONLY; }
-int uv_rdwr() { return O_RDWR; }
-int uv_append() { return O_APPEND; }
-int uv_creat() { return O_CREAT; }
-
-int uv_s_irwxu() { return S_IRWXU; }
-int uv_s_irusr() { return S_IRUSR; }
-int uv_s_iwusr() { return S_IWUSR; }
-int uv_s_ixusr() { return S_IXUSR; }
-int uv_s_irwxg() { return S_IRWXG; }
-int uv_s_irgrp() { return S_IRGRP; }
-int uv_s_iwgrp() { return S_IWGRP; }
-int uv_s_ixgrp() { return S_IXGRP; }
-int uv_s_irwxo() { return S_IRWXO; }
-int uv_s_iroth() { return S_IROTH; }
-int uv_s_iwoth() { return S_IWOTH; }
-int uv_s_ixoth() { return S_IXOTH; }
