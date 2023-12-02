@@ -42,8 +42,6 @@ modules = System.UV
 
 sourcedir = "src"
 
-prebuild = "make -C support; ./gencode.sh"
-
-postbuild = "./cleanup.sh"
+prebuild = "make -C support"
 
 preinstall = "make -C support install"
