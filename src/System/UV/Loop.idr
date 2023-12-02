@@ -1,11 +1,13 @@
 module System.UV.Loop
 
-import public Control.Monad.Either
 import Data.IORef
 import System
 import System.UV.Error
-import System.UV.Raw.Pointer
 import System.UV.Raw.Loop
+import System.UV.Raw.Pointer
+
+import public Control.Monad.Either
+import public System.UV.Data.RunMode
 
 %default total
 
@@ -27,7 +29,7 @@ defaultLoop = MkLoop <$> uv_default_loop
 ||| a covering action.
 covering export %inline
 runLoop : UVLoop -> UVIO ()
-runLoop l = uvio $ uv_run l.loop 0
+runLoop l = uvio $ uv_run l.loop (toCode Default)
 
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.

@@ -9,7 +9,6 @@ import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Util
 
-import public System.UV.File.Flags
 import public System.UV.Raw.File
 
 %default total
@@ -182,7 +181,7 @@ fsWriteBytesFrom f dat offset onErr = do
   buf <- fromByteString dat
   res <- uv_fs_write_sync l.loop f.file buf 1 offset
   freeBuf buf
-  liftIO $ traverse_ onErr (toErr res)
+  liftIO $ onErr (fromCode res)
 
 export %inline
 fsWriteBytes :

@@ -3,6 +3,8 @@ module System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
 
+import public System.UV.Data.RunMode
+
 %default total
 
 --------------------------------------------------------------------------------
@@ -26,15 +28,6 @@ prim__uv_loop_alive : Ptr Loop -> PrimIO Int32
 
 covering %foreign (idris_uv "uv_run")
 prim__uv_run : Ptr Loop -> Bits32 -> PrimIO Int32
-
-export %foreign (idris_uv "uv_run_default")
-UV_RUN_DEFAULT : Bits32
-
-export %foreign (idris_uv "uv_run_once")
-UV_RUN_ONCE : Bits32
-
-export %foreign (idris_uv "uv_run_nowait")
-UV_RUN_NOWAIT : Bits32
 
 --------------------------------------------------------------------------------
 -- API

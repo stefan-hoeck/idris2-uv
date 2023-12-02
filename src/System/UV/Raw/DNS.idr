@@ -5,6 +5,8 @@ import System.UV.Raw.Pointer
 import System.UV.Raw.Loop
 import System.UV.Raw.Util
 
+import public System.UV.Data.DNS
+
 %default total
 
 --------------------------------------------------------------------------------
@@ -12,76 +14,34 @@ import System.UV.Raw.Util
 --------------------------------------------------------------------------------
 
 %foreign (idris_uv "uv_set_ai_family")
-prim__uv_set_ai_family : Ptr AddrInfo -> Int32 -> PrimIO ()
+prim__uv_set_ai_family : Ptr AddrInfo -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_set_ai_socktype")
-prim__uv_set_ai_socktype : Ptr AddrInfo -> Int32 -> PrimIO ()
+prim__uv_set_ai_socktype : Ptr AddrInfo -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_set_ai_protocol")
-prim__uv_set_ai_protocol : Ptr AddrInfo -> Int32 -> PrimIO ()
+prim__uv_set_ai_protocol : Ptr AddrInfo -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_set_ai_flags")
-prim__uv_set_ai_flags : Ptr AddrInfo -> Int32 -> PrimIO ()
+prim__uv_set_ai_flags : Ptr AddrInfo -> Bits32 -> PrimIO ()
 
 %foreign (idris_uv "uv_get_ai_family")
-prim__uv_get_ai_family : Ptr AddrInfo -> PrimIO Int32
+prim__uv_get_ai_family : Ptr AddrInfo -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_ai_socktype")
-prim__uv_get_ai_socktype : Ptr AddrInfo -> PrimIO Int32
+prim__uv_get_ai_socktype : Ptr AddrInfo -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_ai_protocol")
-prim__uv_get_ai_protocol : Ptr AddrInfo -> PrimIO Int32
+prim__uv_get_ai_protocol : Ptr AddrInfo -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_ai_flags")
-prim__uv_get_ai_flags : Ptr AddrInfo -> PrimIO Int32
+prim__uv_get_ai_flags : Ptr AddrInfo -> PrimIO Bits32
 
 %foreign (idris_uv "uv_get_ai_addr")
 prim__uv_get_ai_addr : Ptr AddrInfo -> PrimIO (Ptr SockAddr)
 
 %foreign (idris_uv "uv_freeaddrinfo")
 prim__uv_freeaddrinfo : Ptr AddrInfo -> PrimIO ()
-
-export %foreign (idris_uv "uv_af_inet")
-uv_af_inet : Int32
-
-export %foreign (idris_uv "uv_af_inet6")
-uv_af_inet6 : Int32
-
-export %foreign (idris_uv "uv_af_unix")
-uv_af_unix : Int32
-
-export %foreign (idris_uv "uv_af_unspec")
-uv_af_unspec : Int32
-
-export %foreign (idris_uv "uv_sock_stream")
-uv_sock_stream : Int32
-
-export %foreign (idris_uv "uv_sock_dgram")
-uv_sock_dgram : Int32
-
-export %foreign (idris_uv "uv_sock_raw")
-uv_sock_raw : Int32
-
-export %foreign (idris_uv "uv_sock_any")
-uv_sock_any : Int32
-
-export %foreign (idris_uv "uv_ipproto_ip")
-uv_ipproto_ip : Int32
-
-export %foreign (idris_uv "uv_ipproto_ipv6")
-uv_ipproto_ipv6 : Int32
-
-export %foreign (idris_uv "uv_ipproto_icmp")
-uv_ipproto_icmp : Int32
-
-export %foreign (idris_uv "uv_ipproto_raw")
-uv_ipproto_raw : Int32
-
-export %foreign (idris_uv "uv_ipproto_tcp")
-uv_ipproto_tcp : Int32
-
-export %foreign (idris_uv "uv_ipproto_udp")
-uv_ipproto_udp : Int32
 
 %foreign (idris_uv "uv_getaddrinfo")
 prim__uv_getaddrinfo :
@@ -108,35 +68,35 @@ prim__uv_getnameinfo :
 parameters {auto has : HasIO io}
 
   export %inline
-  uv_set_ai_family : Ptr AddrInfo -> Int32 -> io ()
+  uv_set_ai_family : Ptr AddrInfo -> Bits32 -> io ()
   uv_set_ai_family p f = primIO $ prim__uv_set_ai_family p f
 
   export %inline
-  uv_set_ai_socktype : Ptr AddrInfo -> Int32 -> io ()
+  uv_set_ai_socktype : Ptr AddrInfo -> Bits32 -> io ()
   uv_set_ai_socktype p s = primIO $ prim__uv_set_ai_socktype p s
 
   export %inline
-  uv_set_ai_protocol : Ptr AddrInfo -> Int32 -> io ()
+  uv_set_ai_protocol : Ptr AddrInfo -> Bits32 -> io ()
   uv_set_ai_protocol p v = primIO $ prim__uv_set_ai_protocol p v
-  
+
   export %inline
-  uv_set_ai_flags : Ptr AddrInfo -> Int32 -> io ()
+  uv_set_ai_flags : Ptr AddrInfo -> Bits32 -> io ()
   uv_set_ai_flags p v = primIO $ prim__uv_set_ai_flags p v
 
   export %inline
-  uv_get_ai_family : Ptr AddrInfo -> io Int32
+  uv_get_ai_family : Ptr AddrInfo -> io Bits32
   uv_get_ai_family p = primIO $ prim__uv_get_ai_family p
 
   export %inline
-  uv_get_ai_socktype : Ptr AddrInfo -> io Int32
+  uv_get_ai_socktype : Ptr AddrInfo -> io Bits32
   uv_get_ai_socktype p = primIO $ prim__uv_get_ai_socktype p
 
   export %inline
-  uv_get_ai_protocol : Ptr AddrInfo -> io Int32
+  uv_get_ai_protocol : Ptr AddrInfo -> io Bits32
   uv_get_ai_protocol p = primIO $ prim__uv_get_ai_protocol p
-  
+
   export %inline
-  uv_get_ai_flags : Ptr AddrInfo -> io Int32
+  uv_get_ai_flags : Ptr AddrInfo -> io Bits32
   uv_get_ai_flags p = primIO $ prim__uv_get_ai_flags p
 
   export %inline

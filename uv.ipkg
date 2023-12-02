@@ -4,13 +4,14 @@ authors = "stefan-hoeck"
 brief   = "Idris2 bindings to libuv"
 
 depends = base >= 0.6.0
+        , uv-data
         , elab-util
         , bytestring
-        , finite
 
 modules = System.UV
         , System.UV.DNS
         , System.UV.Error
+        , System.UV.File
         , System.UV.Handle
         , System.UV.Loop
         , System.UV.Pipe
@@ -23,10 +24,6 @@ modules = System.UV
         , System.UV.Timer
         , System.UV.Util
 
-        , System.UV.File
-        , System.UV.File.Flags
-
-        , System.UV.Raw.Error
         , System.UV.Raw.File
         , System.UV.Raw.Handle
         , System.UV.Raw.Idle

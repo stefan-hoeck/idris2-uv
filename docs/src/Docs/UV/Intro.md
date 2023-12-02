@@ -48,7 +48,7 @@ loopExample : IO ()
 loopExample = do
   loop     <- mallocPtr Loop
   resInit  <- uv_loop_init loop
-  resRun   <- uv_run loop UV_RUN_DEFAULT
+  resRun   <- uv_run loop (toCode Default)
   resClose <- uv_loop_close loop
   freePtr loop
 ```
@@ -89,7 +89,7 @@ code:
 defaultLoopExample : IO ()
 defaultLoopExample = do
   loop     <- uv_default_loop
-  resRun   <- uv_run loop UV_RUN_DEFAULT
+  resRun   <- uv_run loop (toCode Default)
   resClose <- uv_loop_close loop
   pure ()
 ```
@@ -123,7 +123,7 @@ idleExample = do
   _        <- uv_idle_init loop handle
   ref      <- newIORef 0
   _        <- uv_idle_start handle (checkCounter 100_000 ref)
-  _        <- uv_run loop UV_RUN_DEFAULT
+  _        <- uv_run loop (toCode Default)
   _        <- uv_loop_close loop
   freePtr handle
 
@@ -150,7 +150,7 @@ the upper bound of the counter. In addition, we add a handle to catch
 the app:
 
 ```idris
-stop : Ptr Idle -> Ptr Signal -> Int32 -> IO ()
+stop : Ptr Idle -> Ptr Signal -> Bits32 -> IO ()
 stop idl _ sig = do
   putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
   ignore $ uv_idle_stop idl
@@ -170,10 +170,10 @@ signalExample = do
   killSwitch <- mallocPtr Signal
   _          <- uv_signal_init loop killSwitch
   _          <- uv_unref killSwitch
-  _          <- uv_signal_start killSwitch (stop idler) uv_sigint
+  _          <- uv_signal_start killSwitch (stop idler) (sigToCode SIGINT)
 
   -- running the app
-  _          <- uv_run loop UV_RUN_DEFAULT
+  _          <- uv_run loop (toCode Default)
 
   -- cleaning up
   _          <- uv_loop_close loop
@@ -218,14 +218,14 @@ onOpen : Ptr Loop -> Ptr Fs -> IO ()
 catFile : Ptr Loop -> String -> IO Int32
 catFile loop path = do
   openFS <- mallocPtr Fs
-  uv_fs_open loop openFS path uv_rdonly 0 (onOpen loop)
+  uv_fs_open loop openFS path (flags RDONLY) 0 (onOpen loop)
 
 fileExample : IO ()
 fileExample = do
   (_::p::_) <- getArgs | _ => die "Invalid number of arguments"
   loop <- uv_default_loop
   _    <- catFile loop p
-  _    <- uv_run loop UV_RUN_DEFAULT
+  _    <- uv_run loop (toCode Default)
   ignore $ uv_loop_close loop
 
 -- main : IO ()
@@ -233,7 +233,7 @@ fileExample = do
 ```
 
 That doesn't look too bad: We get the file path to read as a
-command line argument, setup the main loop, asynchronously open a
+command-line argument, setup the main loop, asynchronously open a
 file and invoke a callback once the file is ready.
 Let's implement `onOpen` next.
 
@@ -250,7 +250,7 @@ onOpen loop openFS = do
   -- checking result: < 0 means an error occured, otherwise, it's a
   -- file handle
   if res < 0
-     then putStrLn "Error when reading: \{uv_strerror res}"
+     then putStrLn "Error when reading: \{errorMsg $ fromCode res}"
      else do
        putStrLn "File opened successfully for reading"
        -- allocating the `uv_fs_t` for reading
@@ -271,7 +271,8 @@ everything works under the hood.
 We first note, that the result of the file opening request is stored in
 the request's `result` field: This is an integer that's either a file
 handle or an error code (if the value is less than zero). In case of
-an error, we can get a proper error message with `uv_strerror`. If all
+an error, we can get a proper error message by converting the result
+to an `UVError` first. If all
 goes well, we have to issue a new asynchronous request. For this, we allocate
 another request pointer (`readFS`). We also need to allocate a byte
 array where the data read from the file can be stored: We allocate
@@ -295,7 +296,7 @@ onRead loop buf file readFS = do
   freePtr readFS
 
   if res < 0
-     then putStrLn "Error opening file: \{uv_strerror res}"
+     then putStrLn "Error opening file: \{errorMsg $ fromCode res}"
      else do
        putStrLn "Read \{show res} bytes of data\n"
        fsWrite <- mallocPtr Fs
@@ -345,7 +346,7 @@ fileExample2 = do
   _     <- uv_unref idler
 
   _     <- catFile loop p
-  _     <- uv_run loop UV_RUN_DEFAULT
+  _     <- uv_run loop (toCode Default)
   _     <- uv_loop_close loop
   freePtr idler
 
@@ -382,7 +383,7 @@ allocBuf cs _ _ buf = initBuf buf cs BufSize
 onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onStreamRead loop stream res buf = do
   if res < 0
-     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}")
+     then when (fromCode res /= EOF) (putStrLn "Error: \{errorMsg $ fromCode res}")
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
 
@@ -395,7 +396,7 @@ streamExample = do
   r    <- uv_pipe_open pipe 0
   cs   <- mallocPtrs Bits8 BufSize
   _    <- uv_read_start pipe (allocBuf cs) (onStreamRead loop)
-  _    <- uv_run loop UV_RUN_DEFAULT
+  _    <- uv_run loop (toCode Default)
   ignore $ uv_loop_close loop
 
 -- main : IO ()
@@ -444,9 +445,9 @@ echoWrite : Ptr Buf -> Ptr Write -> Int32 -> IO ()
 echoWrite buf req status = do
   freePtr buf
   freePtr req
-  when (status < 0) (putStrLn "Write error \{uv_strerror status}")
+  when (status < 0) (putStrLn "Write error \{errorMsg $ fromCode status}")
 
-stopEcho : Ptr Tcp -> Ptr Signal -> Int32 -> IO ()
+stopEcho : Ptr Tcp -> Ptr Signal -> Bits32 -> IO ()
 stopEcho server _ sig = do
   putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
   ignore $ uv_close_sync server
@@ -471,10 +472,10 @@ echoExample = do
   kill   <- mallocPtr Signal
   _      <- uv_signal_init loop kill
   _      <- uv_unref kill
-  _      <- uv_signal_start kill (stopEcho server) uv_sigint
+  _      <- uv_signal_start kill (stopEcho server) (sigToCode SIGINT)
 
-  when (r < 0) (die "Listen error: \{uv_strerror r}")
-  _      <- uv_run loop UV_RUN_DEFAULT
+  when (r < 0) (die "Listen error: \{errorMsg $ fromCode r}")
+  _      <- uv_run loop (toCode Default)
 
   freePtr server
   freePtr addr
@@ -491,7 +492,7 @@ Let's implement `onNewConnection` next:
 ```idris
 onNewConnection loop server status =
   if status < 0
-     then putStrLn "New connection error \{uv_strerror status}"
+     then putStrLn "New connection error \{errorMsg $ fromCode status}"
      else do
        putStrLn "Got a new connection."
        client <- mallocPtr Tcp
@@ -521,8 +522,8 @@ echoRead client nread buf =
        dat <- getBufBase buf
        freePtr dat
        uv_close client freePtr
-       when (nread /= uv_eof) $ do
-         putStrLn "Read error \{uv_strerror nread}"
+       when (fromCode nread /= EOF) $ do
+         putStrLn "Read error \{errorMsg $ fromCode nread}"
 
 -- main : IO ()
 -- main = echoExample
@@ -552,7 +553,8 @@ a server:
 onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 onClientRead loop stream res buf = do
   if res < 0
-     then when (res /= uv_eof) (putStrLn "Error: \{uv_strerror res}") >>
+     then when (fromCode res /= EOF)
+            (putStrLn "Error: \{errorMsg $ fromCode res}") >>
           ignore (uv_close stream freePtr)
      else setBufLen buf (cast res) >>
           ignore (uv_fs_write_sync loop 1 buf 1 (-1))
@@ -568,7 +570,7 @@ onClientConnect : Ptr Loop -> Ptr Tcp -> Ptr Connect -> Int32 -> IO ()
 onClientConnect loop client connect status = do
   freePtr connect
   if status < 0
-     then putStrLn "New connection error: \{uv_strerror status}"
+     then putStrLn "New connection error: \{errorMsg $ fromCode status}"
      else do
        putStrLn "Got a new connection."
        req  <- mallocPtr Write
@@ -590,8 +592,8 @@ clientExample = do
   connect <- mallocPtr Connect
   r       <- uv_tcp_connect connect socket addr (onClientConnect loop socket)
 
-  when (r < 0) (die "Connect error: \{uv_strerror r}")
-  _      <- uv_run loop UV_RUN_DEFAULT
+  when (r < 0) (die "Connect error: \{errorMsg $ fromCode r}")
+  _      <- uv_run loop (toCode Default)
 
   freePtr addr
 
