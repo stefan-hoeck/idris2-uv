@@ -108,4 +108,4 @@ int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
 
-#endif  // SUPPORT_IDRIS2_UV_H_
+#endif // SUPPORT_IDRIS2_UV_H_
