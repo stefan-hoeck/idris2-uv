@@ -21,10 +21,10 @@ int main(void) {
   printf("\npublic export\n");
   printf("sigFromCode : Bits32 -> SigCode\n");
   printf("sigFromCode %d = SIGABRT\n", SIGABRT);
-  printf("sigFromCode %d = SIGFPE \n", SIGFPE);
-  printf("sigFromCode %d = SIGHUP \n", SIGHUP);
-  printf("sigFromCode %d = SIGILL \n", SIGILL);
-  printf("sigFromCode %d = SIGINT \n", SIGINT);
+  printf("sigFromCode %d = SIGFPE\n", SIGFPE);
+  printf("sigFromCode %d = SIGHUP\n", SIGHUP);
+  printf("sigFromCode %d = SIGILL\n", SIGILL);
+  printf("sigFromCode %d = SIGINT\n", SIGINT);
   printf("sigFromCode %d = SIGQUIT\n", SIGQUIT);
   printf("sigFromCode %d = SIGSEGV\n", SIGSEGV);
   printf("sigFromCode %d = SIGTRAP\n", SIGTRAP);

@@ -37,10 +37,10 @@ sigToCode SIGUSR2 = 12
 public export
 sigFromCode : Bits32 -> SigCode
 sigFromCode 6 = SIGABRT
-sigFromCode 8 = SIGFPE 
-sigFromCode 1 = SIGHUP 
-sigFromCode 4 = SIGILL 
-sigFromCode 2 = SIGINT 
+sigFromCode 8 = SIGFPE
+sigFromCode 1 = SIGHUP
+sigFromCode 4 = SIGILL
+sigFromCode 2 = SIGINT
 sigFromCode 3 = SIGQUIT
 sigFromCode 11 = SIGSEGV
 sigFromCode 5 = SIGTRAP
