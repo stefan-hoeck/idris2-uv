@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <uv.h>
 
-
 int main(void) {
   printf("\npublic export\n");
   printf("sigToCode : SigCode -> Bits32\n");
