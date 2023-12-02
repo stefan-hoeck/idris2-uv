@@ -233,7 +233,7 @@ fileExample = do
 ```
 
 That doesn't look too bad: We get the file path to read as a
-command line argument, setup the main loop, asynchronously open a
+command-line argument, setup the main loop, asynchronously open a
 file and invoke a callback once the file is ready.
 Let's implement `onOpen` next.
 
