@@ -1,5 +1,8 @@
 // Copyright Stefan Höck
 
+#ifndef SUPPORT_IDRIS2_UV_H_
+#define SUPPORT_IDRIS2_UV_H_
+
 uv_buf_t uv_deref_buf(uv_buf_t *ptr);
 
 char *uv_get_buf_base(uv_buf_t *buf);
@@ -104,3 +107,5 @@ uint64_t uv_get_f_ffree(uv_statfs_t *stat);
 int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
+
+#endif

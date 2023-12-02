@@ -92,7 +92,7 @@ EOT
 
 codegen/dns_gen >>src/System/UV/Data/DNS.idr
 
-cat >src/System/UV/Data/File.idr << EOT
+cat >src/System/UV/Data/File.idr <<EOT
 module System.UV.Data.File
 
 import Derive.Prelude
@@ -146,7 +146,7 @@ EOT
 
 codegen/file_gen >>src/System/UV/Data/File.idr
 
-cat >src/System/UV/Data/Signal.idr << EOT
+cat >src/System/UV/Data/Signal.idr <<EOT
 module System.UV.Data.Signal
 
 import Derive.Prelude
