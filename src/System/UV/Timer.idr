@@ -22,7 +22,7 @@ parameters {auto l : UVLoop}
   ||| Execution will be stopped when the I/O action returns `False`.
   |||
   ||| If `reference` is set to `False`, the timer handle will not be
-  ||| referenced at the event loop: The loop will terminate, if there
+  ||| referenced at the event loop: The loop will terminate, if there are
   ||| only unreferenced handles left.
   export
   timer : (repeat : Bits64) -> (reference : Bool) -> IO Bool -> UVIO ()
