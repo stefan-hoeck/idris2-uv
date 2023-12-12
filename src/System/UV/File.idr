@@ -1,5 +1,8 @@
 module System.UV.File
 
+import System.Rx.Core
+import System.Rx.Pipe
+import Data.IORef
 import Data.Buffer.Indexed
 import Data.ByteString
 import Data.Buffer
@@ -169,70 +172,54 @@ readText path bytes cb =
 --------------------------------------------------------------------------------
 
 export
-fsWriteBytesFrom :
-     {auto has : HasIO io}
-  -> {auto l : UVLoop}
+fsWriteBytes :
+     {auto l : UVLoop}
   -> File
-  -> ByteString
   -> (offset : Int64)
   -> (onErr : UVError -> IO ())
-  -> io ()
-fsWriteBytesFrom f dat offset onErr = do
-  buf <- fromByteString dat
-  res <- uv_fs_write_sync l.loop f.file buf 1 offset
-  freeBuf buf
-  liftIO $ onErr (fromCode res)
+  -> Sink [] ByteString
+fsWriteBytes f offset onErr = MkSink $ do
+  sr <- sourceRef [] ByteString
+  fs <- mallocPtr Fs
+  pure $ \src => do
+    writeIORef sr src
+    request sr (cb sr fs)
+
+  where
+    cb : SourceRef [] ByteString -> Ptr Fs -> Callback [] ByteString
+    cb sr fs (Next vs) = do
+      buf <- fromByteString (fastConcat vs)
+      res <- uv_fs_write l.loop fs f.file buf 1 offset
+        (\p => freeBuf buf >> assert_total (request sr (cb sr fs)))
+      case uvRes res of
+        Left err => cancel sr >> freeBuf buf >> freePtr fs >> onErr err
+        _        => pure ()
+    cb sr fs (Done vs) = do
+      cancel sr
+      buf <- fromByteString (fastConcat vs)
+      res <- uv_fs_write l.loop fs f.file buf 1 offset
+        (\p => freeBuf buf >> freePtr fs)
+      case uvRes res of
+        Left err => freeBuf buf >> freePtr fs >> onErr err
+        _        => pure ()
+    cb sr fs (Err err) impossible
 
 export %inline
-fsWriteBytes :
-     {auto has : HasIO io}
-  -> {auto l : UVLoop}
-  -> File
-  -> ByteString
-  -> (onErr : UVError -> IO ())
-  -> io ()
-fsWriteBytes f dat onErr = fsWriteBytesFrom f dat (-1) onErr
-
-export
-fsWrite :
-     {auto l : UVLoop}
-  -> (path : String)
-  -> ByteString
-  -> (onErr : UVError -> IO ())
-  -> UVIO ()
-fsWrite path dat onErr = do
-  fsOpen path (WRONLY <+> CREAT) neutral $
-    \case Left err => pure ()
-          Right f  => fsWriteBytes f dat onErr >> fsClose f
-
-export
-putOut : UVLoop => HasIO io => String -> io ()
-putOut s = fsWriteBytes stdout (fromString s) (const $ pure ())
+bytesOut : UVLoop => Sink [] ByteString
+bytesOut = fsWriteBytes stdout 0 (\_ => pure ())
 
 export %inline
-putOutLn : UVLoop => HasIO io => String -> io ()
-putOutLn s = putOut (s ++ "\n")
+putOut : UVLoop => Sink [] String
+putOut = map fromString >- bytesOut
 
 export %inline
-printOut : UVLoop => HasIO io => Show a => a -> io ()
-printOut = putOut . show
+putOutLn : UVLoop => Sink [] String
+putOutLn = map (fromString . (++ "\n")) >- bytesOut
 
 export %inline
-printOutLn : UVLoop => HasIO io => String -> io ()
-printOutLn = putOutLn . show
-
-export
-putErr : UVLoop => HasIO io => String -> io ()
-putErr s = fsWriteBytes stderr (fromString s) (const $ pure ())
+printOut : UVLoop => Show a => Sink [] a
+printOut = map (fromString . show) >- bytesOut
 
 export %inline
-putErrLn : UVLoop => HasIO io => String -> io ()
-putErrLn s = putErr (s ++ "\n")
-
-export %inline
-printErr : UVLoop => HasIO io => Show a => a -> io ()
-printErr = putErr . show
-
-export %inline
-printErrLn : UVLoop => HasIO io => String -> io ()
-printErrLn = putErrLn . show
+printOutLn : UVLoop => Show a => Sink [] a
+printOutLn = map (fromString . (++ "\n") . show) >- bytesOut
