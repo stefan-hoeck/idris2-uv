@@ -184,7 +184,7 @@ writeBytes :
   -> Sink [] ByteString
 writeBytes openFile offset onErr = MkSink $ \fuel => do
   fs <- mallocPtr Fs
-  sr <- pipeRef [] ByteString (releaseFs fs)
+  sr <- sinkRef [] ByteString (releaseFs fs)
   openFile $ \case
     Left err     => onErr err >> close sr
     Right (io,h) => appendResource sr io >> request sr (cb fuel sr fs h)
@@ -193,7 +193,7 @@ writeBytes openFile offset onErr = MkSink $ \fuel => do
   where
     cb :
          Fuel
-      -> PipeRef [] ByteString
+      -> SinkRef [] ByteString
       -> Ptr Fs
       -> File
       -> Callback [] ByteString

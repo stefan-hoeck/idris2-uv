@@ -164,6 +164,16 @@ export %inline
 emit1 : SourceRef es a -> a -> IO ()
 emit1 ref = emit ref . pure
 
+||| Closes a source without sending a message to callbacks.
+export %inline
+abort : SourceRef es a -> IO ()
+abort ref =
+  readIORef ref >>= \case
+    Waiting x => x
+    CB x _    => x
+    Closed    => pure ()
+    SrcErr _  => pure ()
+
 ||| Closes a source by sending `Done []` to any registered callback
 ||| and setting its state to `Closed`.
 export %inline
@@ -177,13 +187,13 @@ error : Has e es => SourceRef es a -> (x : e) -> IO ()
 error ref x = send ref (Err $ inject x)
 
 export
-registerCB : SourceRef es a -> Callback es a -> IO ()
+registerCB : SourceRef es a -> Callback es a -> IO Bool
 registerCB ref cb = do
   readIORef ref >>= \case
-    Waiting io => writeIORef ref (CB io cb)
-    Closed     => cb (Done [])
-    CB io f    => writeIORef ref (CB io cb)
-    SrcErr x   => cb (Err x)
+    Waiting io => writeIORef ref (CB io cb) $> True
+    Closed     => cb (Done [])              $> False
+    CB io f    => writeIORef ref (CB io cb) $> True
+    SrcErr x   => cb (Err x)                $> False
 
 ||| Convert a mutable reference for callbacks plus a cleanup action
 ||| to a "hot" source.
@@ -193,7 +203,7 @@ registerCB ref cb = do
 export
 hotSrc : SourceRef es a -> Src es a
 hotSrc ref Nothing  = close ref
-hotSrc ref (Just f) = registerCB ref f
+hotSrc ref (Just f) = ignore $ registerCB ref f
 
 ||| A cold source is one that emits only after a callback has
 ||| been registered.
@@ -204,6 +214,6 @@ export
 coldSrc : SourceRef es a -> (Callback es a -> IO ()) -> Src es a
 coldSrc ref _     Nothing  = close ref
 coldSrc ref serve (Just f) = do
-  registerCB ref f
+  ignore $ registerCB ref f
   CB _ _ <- readIORef ref | _ => pure ()
   serve (send ref)

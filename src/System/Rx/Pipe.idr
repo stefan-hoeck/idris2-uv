@@ -10,7 +10,7 @@ import System.Rx.Source
 
 %default total
 
-errSrc : PipeRef es a -> (HSum es -> IO ()) -> Src [] a
+errSrc : SinkRef es a -> (HSum es -> IO ()) -> Src [] a
 errSrc ref f Nothing  = close ref
 errSrc ref f (Just g) = request ref $ \case
   Next vs => g (Next vs)
@@ -20,14 +20,14 @@ errSrc ref f (Just g) = request ref $ \case
 export
 handle : (HSum es -> IO ()) -> Pipe es [] a a
 handle f = MkPipe $ do
-  ref  <- pipeRef es a (pure ())
+  ref  <- sinkRef es a (pure ())
   pure (sink ref, errSrc ref f)
 
 export
 dropErrs : Pipe es [] a a
 dropErrs = handle (const $ pure ())
 
-syncSrc : PipeRef es a -> (List a -> IO (Msg es b)) -> Src es b
+syncSrc : SinkRef es a -> (List a -> IO (Msg es b)) -> Src es b
 syncSrc ref f Nothing  = close ref
 syncSrc ref f (Just g) = request ref $ \case
   Next vs => do
@@ -44,7 +44,7 @@ export
 syncPipe : (convert : IO (List a -> IO (Msg es b))) -> Pipe es es a b
 syncPipe convert = MkPipe $ do
   conv <- convert
-  ref  <- pipeRef es a (pure ())
+  ref  <- sinkRef es a (pure ())
   pure (sink ref, syncSrc ref conv)
 
 export
@@ -123,8 +123,79 @@ bytes : Pipe es es String ByteString
 bytes = map fromString
 
 --------------------------------------------------------------------------------
--- Buffering
+-- Sequencing Sources
 --------------------------------------------------------------------------------
+
+data FlatMapST : List Type -> Type -> Type where
+  Sources : (active : Src es b) -> (srcs : List (Source es b)) -> FlatMapST es b
+  NoSrc   : FlatMapST es b
+
+parameters (snk : SinkRef es a)
+           (src : SourceRef es b)
+           (st  : IORef (FlatMapST es b))
+
+  cleanup : IO ()
+  cleanup = do
+    close snk
+    abort src
+    Sources s _ <- readIORef st | NoSrc => pure ()
+    s Nothing
+
+  covering
+  flatMapA : (a -> Source es b) -> Callback es a
+
+  flatMapB : Callback es b
+
+  flatMapA f (Next vs) =
+    case map f vs of
+      h::t => do
+        s <- h.mkSource
+        writeIORef st (Sources s t)
+        s (Just flatMapB)
+      []   => request snk (flatMapA f)
+
+  flatMapA f (Done vs) = do
+    abort snk
+    case map f vs of
+      h::t => do
+        s <- h.mkSource
+        writeIORef st (Sources s t)
+        s (Just flatMapB)
+      []   => writeIORef st NoSrc >> send src (Done [])
+
+  flatMapA f (Err x)   = send src (Err x) >> cleanup
+
+  flatMapB (Next vs) = emit src vs
+  flatMapB (Err x)   = send src (Err x) >> cleanup
+  flatMapB (Done vs) = do
+    Sources _ (h::t) <- readIORef st
+      | _ => do
+        writeIORef st NoSrc
+        b <- closed snk
+        if b then send src (Done vs) else emit src vs
+    s <- h.mkSource
+    writeIORef st (Sources s t)
+    emit src vs
+
+  covering
+  flatMapSrc : (a -> Source es b) -> Src es b
+  flatMapSrc f Nothing   = cleanup
+  flatMapSrc f (Just cb) = do
+    True        <- registerCB src cb | False => pure ()
+    Sources s _ <- readIORef st      | NoSrc => request snk (flatMapA f)
+    s (Just flatMapB)
+
+export covering
+flatMap : (a -> Source es b) -> Pipe es es a b
+flatMap f = MkPipe $ do
+  snk <- sinkRef es a (pure ())
+  src <- sourceRef es b (pure ())
+  st  <- newIORef (NoSrc {es} {b})
+  pure (sink snk, flatMapSrc snk src st f)
+--
+-- --------------------------------------------------------------------------------
+-- -- Buffering
+-- --------------------------------------------------------------------------------
 --
 -- data BufferST : List Type -> Type -> Type where
 --   Empty    : BufferST es s
@@ -166,7 +237,7 @@ bytes = map fromString
 --
 -- record BufferRefs (es : List Type) (s,a,b : Type) where
 --   constructor BR
---   snk    : PipeRef es a
+--   snk    : SinkRef es a
 --   src    : SourceRef es b
 --   buffer : IORef (BufferST es s)
 --
