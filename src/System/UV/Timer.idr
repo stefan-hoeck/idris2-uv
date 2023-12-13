@@ -5,13 +5,11 @@
 ||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
-import Data.IORef
-import System.Rx.Core
+import System.Rx
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Resource
 import public System.UV.Raw.Timer
 
 %default total
@@ -21,10 +19,11 @@ import public System.UV.Raw.Timer
 export
 timer : (l : UVLoop) => (timeout,repeat : Bits64) -> Source [UVError] ()
 timer t r = MkSource $ do
-  cb <- cbRef [UVError] ()
-  h  <- mallocPtr Timer
-  Right () <- uvRes <$> uv_timer_init l.loop h
-    | Left e => releaseHandle h >> pure (fail e)
-  Right () <- uvRes <$> uv_timer_start h (\_ => send cb (Next [()])) t r
-    | Left e => releaseHandle h >> pure (fail e)
-  pure (toSrc cb $ releaseHandle h)
+  h   <- mallocPtr Timer
+  ref <- sourceRef [UVError] () (releaseHandle h)
+  r1 <- uv_timer_init l.loop h
+  r2 <- uv_timer_start h (\_ => emit1 ref ()) t r
+  case uvRes r1 >> uvRes r2 of
+    Left e   => error ref e
+    Right () => pure ()
+  pure $ hotSrc ref

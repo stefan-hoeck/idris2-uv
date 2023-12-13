@@ -34,17 +34,14 @@ runLoop l = uvio $ uv_run l.loop (toCode Default)
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.
 covering export
-runUV : (UVLoop => UVIO ()) -> IO ()
+runUV : (UVLoop => IO ()) -> IO ()
 runUV act = do
-  Right () <- runEitherT run' | Left err => die "\{err}"
-  pure ()
-
-  where
-    run' : UVIO ()
-    run' = do
-      loop <- defaultLoop
-      act @{loop}
-      runLoop loop
+  loop <- defaultLoop
+  act @{loop}
+  res <- uv_run loop.loop (toCode Default)
+  case uvRes res of
+    Left err => die "\{err}"
+    Right _  => pure ()
 
 export
 runUVIO : UVIO () -> IO ()

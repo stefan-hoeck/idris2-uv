@@ -38,8 +38,12 @@ modules = System.UV
         , System.UV.Raw.Timer
         , System.UV.Raw.Util
 
+        , System.Rx
         , System.Rx.Core
+        , System.Rx.Msg
         , System.Rx.Pipe
+        , System.Rx.Sink
+        , System.Rx.Source
 
 sourcedir = "src"
 
