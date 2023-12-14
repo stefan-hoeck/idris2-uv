@@ -8,6 +8,7 @@ import Data.String
 import Data.Buffer.Indexed
 import System.Rx
 import System.UV
+import System.UV.Pipe
 import System
 
 fileNames : List String -> List String
@@ -23,6 +24,14 @@ cat = do
     |>  printErrs
     |>> toFile "out.txt"
 
+readIn : IO ()
+readIn = do
+  runUV $
+        streamStdin
+    |>  printErrs
+    |>  snocBuffer 0xffff
+    |>> toFile "out.txt"
+
 timer : IO ()
 timer =
   runUV $
@@ -36,7 +45,7 @@ timer =
     |>> appendToFile "test.txt"
 
 main : IO ()
-main = cat
+main = readIn
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown

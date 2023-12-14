@@ -127,47 +127,31 @@ bytes = map fromString
 --------------------------------------------------------------------------------
 
 data FlatMapST : List Type -> Type -> Type where
-  Sources : (active : Src es b) -> (srcs : List (Source es b)) -> FlatMapST es b
+  Sources : (cur : Src es b) -> (srcs : List (Source es b)) -> FlatMapST es b
   NoSrc   : FlatMapST es b
 
-parameters (snk : SinkRef es a)
-           (src : SourceRef es b)
-           (st  : IORef (FlatMapST es b))
+parameters (snk : SinkRef es a)           -- upstream facing sink
+           (src : SourceRef es b)         -- downstream facing source
+           (st  : IORef (FlatMapST es b)) -- currently available sources
 
+  -- cleanup without sending out any more messages to callbacks
   cleanup : IO ()
   cleanup = do
-    close snk
-    abort src
+    close snk -- close the sink
+    abort src -- signal `Nothing` to the source of sources
     Sources s _ <- readIORef st | NoSrc => pure ()
-    s Nothing
+    s Nothing -- signal `Nothing` to the currently active source
 
-  covering
-  flatMapA : (a -> Source es b) -> Callback es a
-
+  -- Callback for sending messages downstream
   flatMapB : Callback es b
-
-  flatMapA f (Next vs) =
-    case map f vs of
-      h::t => do
-        s <- h.mkSource
-        writeIORef st (Sources s t)
-        s (Just flatMapB)
-      []   => request snk (flatMapA f)
-
-  flatMapA f (Done vs) = do
-    abort snk
-    case map f vs of
-      h::t => do
-        s <- h.mkSource
-        writeIORef st (Sources s t)
-        s (Just flatMapB)
-      []   => writeIORef st NoSrc >> send src (Done [])
-
-  flatMapA f (Err x)   = send src (Err x) >> cleanup
-
   flatMapB (Next vs) = emit src vs
   flatMapB (Err x)   = send src (Err x) >> cleanup
   flatMapB (Done vs) = do
+    -- our current source is exhausted, so we activate the
+    -- next one. In case we have no more sources, we ask
+    -- upstream for more, or - if upstream is closed - send
+    -- the last bit of data (`vs`) wrapped in a `Done` to
+    -- downstream
     Sources _ (h::t) <- readIORef st
       | _ => do
         writeIORef st NoSrc
@@ -177,6 +161,48 @@ parameters (snk : SinkRef es a)
     writeIORef st (Sources s t)
     emit src vs
 
+  -- Callback for getting sources from upstream.
+  covering
+  flatMapA : (a -> Source es b) -> Callback es a
+  flatMapA f (Next vs) =
+    case map f vs of
+      -- we got a batch of new sources so we activate the first one
+      -- and store the rest for later
+      h::t => do
+        s <- h.mkSource
+        writeIORef st (Sources s t)
+        s (Just flatMapB)
+
+      -- we got nothing so we request more sources from upstream
+      []   => request snk (flatMapA f)
+
+  flatMapA f (Done vs) = do
+    -- like `Next vs` but we can close our sink because upstream
+    -- is exhausted
+    abort snk
+    case map f vs of
+      -- we got a last batch of sources so we activate the first one
+      -- and store the rest for later
+      h::t => do
+        s <- h.mkSource
+        writeIORef st (Sources s t)
+        s (Just flatMapB)
+      []   =>
+        -- we won't get any more sources from upstream, so we can
+        -- signal that we are done to downstream
+        writeIORef st NoSrc >> send src (Done [])
+
+  -- upstream responded with an error, so we send that to downstream
+  -- and stop everything.
+  -- TODO: Should we delay the error and first exhaust the sources we
+  --       currently have?
+  flatMapA f (Err x) = send src (Err x) >> cleanup
+
+  -- our downstream-facing source
+  -- if downstream requests more data (the `Just cb` case), we first
+  -- check if there are any active source left. If that's the case,
+  -- we ourselves request more data from the active source. Otherwise,
+  -- we ask upstream for new sources.
   covering
   flatMapSrc : (a -> Source es b) -> Src es b
   flatMapSrc f Nothing   = cleanup
@@ -192,120 +218,90 @@ flatMap f = MkPipe $ do
   src <- sourceRef es b (pure ())
   st  <- newIORef (NoSrc {es} {b})
   pure (sink snk, flatMapSrc snk src st f)
---
--- --------------------------------------------------------------------------------
--- -- Buffering
--- --------------------------------------------------------------------------------
---
--- data BufferST : List Type -> Type -> Type where
---   Empty    : BufferST es s
---   Spent    : BufferST es s
---   Err      : HSum es -> BufferST es s
---   Done     : (val : s) -> BufferST es s
---   Acc      : Nat -> (val : s) -> BufferST es s
---   Overflow : (val : s) -> BufferST es s
---
--- onMsg : Nat -> s -> (s -> a -> s) -> BufferST es s -> Msg es a -> BufferST es s
--- onMsg _ _   f (Acc (S k) v) (Next vs) = Acc k (foldl f v vs)
--- onMsg _ _   f (Acc 0     v) (Next vs) = Overflow (foldl f v vs)
--- onMsg _ _   f (Acc _     v) (Done vs) = Done (foldl f v vs)
---
--- onMsg n ini f Empty         (Next vs) = Acc n (foldl f ini vs)
--- onMsg _ ini f Empty         (Done vs) = Done (foldl f ini vs)
---
--- onMsg _ _   f (Overflow v)  (Done vs) = Done (foldl f v vs)
---
--- onMsg _ _   _ _             (Err v)   = Err v
---
--- onMsg _ _   _ st            _         = st
---
--- afterSending : BufferST es s -> BufferST es s
--- afterSending Empty          = Empty
--- afterSending Spent          = Spent
--- afterSending (Err x)        = Spent
--- afterSending (Done val)     = Spent
--- afterSending (Acc k val)    = Empty
--- afterSending (Overflow val) = Empty
---
--- bufferMsg : (conv : s -> List b) -> BufferST es s -> Msg es b
--- bufferMsg conv (Acc k val)    = Next (conv val)
--- bufferMsg conv Empty          = Next []
--- bufferMsg conv Spent          = Done []
--- bufferMsg conv (Err x)        = Err x
--- bufferMsg conv (Done val)     = Done (conv val)
--- bufferMsg conv (Overflow val) = Next (conv val)
---
--- record BufferRefs (es : List Type) (s,a,b : Type) where
---   constructor BR
---   snk    : SinkRef es a
---   src    : SourceRef es b
---   buffer : IORef (BufferST es s)
---
--- cancel : BufferRefs es s a b -> IO ()
--- cancel (BR snk src buf) = cancel snk >> writeIORef buf Spent >> drain src
---
--- parameters {0 es    : List Type}
---            (size    : Nat)
---            (ini     : s)
---            (acc     : s -> a -> s)
---            (conv    : s -> List b)
---
---   bufferedSink : BufferRefs es s a b -> Snk es a
---
---   bufferedSrc : BufferRefs es s a b -> Src es b
---
---   bufferedServe : BufferRefs es s a b -> Callback es a
---
---   setBuffer : BufferRefs es s a b -> BufferST es s -> IO ()
---
---   sendBuffer : BufferRefs es s a b -> Callback es b -> BufferST es s -> IO ()
---   sendBuffer br cb st = do
---     writeIORef br.src Waiting
---     cb (bufferMsg conv st)
---     let st2 := afterSending st
---     writeIORef br.buffer st2
---     case st2 of
---       Empty => assert_total $ request br.snk (bufferedServe br)
---       _     => pure ()
---
---   bufferedSrc br Nothing = cancel br
---   bufferedSrc br (Just cb) = do
---     Empty <- readIORef br.buffer | st => sendBuffer br cb st
---     writeIORef br.src (CB cb)
---
---   setBuffer br st = do
---     Nothing <- readIORef br.cb | CB cb => sendBuffer br cb st
---     writeIORef br.buffer st
---     case st of
---       Acc _ _ => assert_total $ request br.snk (bufferedServe br)
---       _       => pure ()
---
---   bufferedSink br snk =
---     sink br.snk snk >> (snk $ Just (bufferedServe br))
---
---   bufferedServe br msg =
---     readIORef br.buffer >>= \st => setBuffer br (onMsg size ini acc st msg)
---
---   export
---   bufferedPipe : Pipe es es a b
---   bufferedPipe = MkPipe $ do
---     snk    <- sinkRef es a
---     cb     <- cbRef es b
---     buffer <- newIORef {a = BufferST es s} Empty
---
---     pure (bufferedSink (BR snk cb buffer), bufferedSrc (BR snk cb buffer))
---
--- ||| Buffers up to `n` chunks of input in a `SnocList`
--- export %inline
--- snocBuffer : Nat -> Pipe es es a a
--- snocBuffer n = bufferedPipe n [<] (:<) (<>> [])
---
--- ||| Buffers up to `n` chunks of input by keeping only the last value
--- export %inline
--- lastBuffer : Nat -> Pipe es es a a
--- lastBuffer n = bufferedPipe n Nothing (const Just) toList
---
--- ||| Buffers only the first chunk of input discarding all later events
--- export %inline
--- firstBuffer : Pipe es es a a
--- firstBuffer = bufferedPipe 0 Nothing (\m,v => m <|> Just v) toList
+
+--------------------------------------------------------------------------------
+-- Buffering
+--------------------------------------------------------------------------------
+
+data BufferST : Type -> Type where
+  Empty    : BufferST s
+  Acc      : Nat -> (val : s) -> BufferST s
+
+record BufferRefs (es : List Type) (s,a,b : Type) where
+  constructor BR
+  snk    : SinkRef es a
+  src    : SourceRef es b
+  buffer : IORef (BufferST s)
+
+parameters {0 es    : List Type}
+           (size    : Nat)
+           (ini     : s)
+           (acc     : s -> a -> s)
+           (conv    : s -> List b)
+
+  buffer : BufferRefs es s a b -> Msg [] a -> IO Bool
+  buffer br msg = do
+    False <- hasCB br.src
+      | True =>
+          case msg of
+            Next vs => send br.src (Next $ conv $ foldl acc ini vs) $> True
+            Done vs => send br.src (Done $ conv $ foldl acc ini vs) $> True
+    readIORef br.buffer >>= \case
+      Empty       => writeIORef br.buffer (Acc size $ foldl acc ini msg) $> True
+      Acc (S k) v => writeIORef br.buffer (Acc k $ foldl acc v msg) $> True
+      Acc 0     v => pure False
+
+  covering
+  bufferedSrc : BufferRefs es s a b -> Src es b
+
+  covering
+  bufferedCB : BufferRefs es s a b -> Callback es a
+  bufferedCB br (Next vs) = do
+    True <- buffer br (Next vs) | False => pure ()
+    request br.snk (bufferedCB br)
+  bufferedCB br (Done vs) = abort br.snk >> ignore (buffer br $ Done vs)
+  bufferedCB br (Err x)   = abort br.snk >> send br.src (Err x)
+
+  covering
+  sendBuffer : BufferRefs es s a b -> Callback es b -> Nat -> s -> IO ()
+  sendBuffer br cb k vs = do
+    writeIORef br.buffer Empty
+    False <- closed br.snk | _ => abort br.src >> cb (Done $ conv vs)
+    when (k == 0) (request br.snk (bufferedCB br))
+    cb (Next $ conv vs)
+
+  bufferedSrc br Nothing =
+    abort br.src >> close br.snk >> writeIORef br.buffer Empty
+  bufferedSrc br (Just cb) = do
+    Empty <- readIORef br.buffer | Acc n vs => sendBuffer br cb n vs
+    ignore $ registerCB br.src cb
+
+  covering
+  bufferedSink : BufferRefs es s a b -> Snk es a
+  bufferedSink br src =
+    sink br.snk src >> request br.snk (bufferedCB br)
+
+  export covering
+  bufferedPipe : Pipe es es a b
+  bufferedPipe = MkPipe $ do
+    snk    <- sinkRef es a (pure ())
+    src    <- sourceRef es b (pure ())
+    buffer <- newIORef {a = BufferST s} Empty
+
+    let br := BR snk src buffer
+    pure (bufferedSink br, bufferedSrc (BR snk src buffer))
+
+||| Buffers up to `n` chunks of input in a `SnocList`
+export covering %inline
+snocBuffer : Nat -> Pipe es es a a
+snocBuffer n = bufferedPipe n [<] (:<) (<>> [])
+
+||| Buffers up to `n` chunks of input by keeping only the last value
+export covering %inline
+lastBuffer : Nat -> Pipe es es a a
+lastBuffer n = bufferedPipe n Nothing (const Just) toList
+
+||| Buffers only the first chunk of input discarding all later events
+export covering %inline
+firstBuffer : Pipe es es a a
+firstBuffer = bufferedPipe 0 Nothing (\m,v => m <|> Just v) toList

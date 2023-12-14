@@ -91,6 +91,22 @@ export %inline
 once : a -> Source es a
 once = batch . pure
 
+||| Lifts an `IO` action that can fail into a source.
+|||
+||| Upon the first request, the source will run the action
+||| and invoke the callback either with `Done` or with `Err`.
+export %inline
+lift : IO (Either (HSum es) (List a)) -> Source es a
+lift io =
+  pureSrc $ traverse_ $ \cb => io >>= \case
+    Left err => cb (Err err)
+    Right vs => cb (Done vs)
+
+||| Lifts an `IO` action returning a single value into a source.
+export %inline
+lift1 : IO (Either (HSum es) a) -> Source es a
+lift1 = lift . map (map pure)
+
 --------------------------------------------------------------------------------
 -- Stateful Sources
 --------------------------------------------------------------------------------
@@ -169,8 +185,8 @@ export %inline
 abort : SourceRef es a -> IO ()
 abort ref =
   readIORef ref >>= \case
-    Waiting x => x
-    CB x _    => x
+    Waiting x => writeIORef ref Closed >> x
+    CB x _    => writeIORef ref Closed >> x
     Closed    => pure ()
     SrcErr _  => pure ()
 
@@ -194,6 +210,14 @@ registerCB ref cb = do
     Closed     => cb (Done [])              $> False
     CB io f    => writeIORef ref (CB io cb) $> True
     SrcErr x   => cb (Err x)                $> False
+
+||| True if the given source has a callback registered
+export
+hasCB : SourceRef es a -> IO Bool
+hasCB ref =
+  readIORef ref >>= \case
+    CB _ _ => pure True
+    _      => pure False
 
 ||| Convert a mutable reference for callbacks plus a cleanup action
 ||| to a "hot" source.

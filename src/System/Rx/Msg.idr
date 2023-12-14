@@ -16,6 +16,12 @@ isTerminal : Msg es a -> Bool
 isTerminal (Next _) = False
 isTerminal _        = True
 
+public export
+weaken : Msg [] a -> Msg es a
+weaken (Next vs) = Next vs
+weaken (Done vs) = Done vs
+weaken (Err err) impossible
+
 --------------------------------------------------------------------------------
 -- Implementations
 --------------------------------------------------------------------------------
