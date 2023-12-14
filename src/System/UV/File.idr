@@ -54,7 +54,7 @@ withFile act p = do
 
 ||| Asynchronously opens a file, invoking the given callback once
 ||| the file is ready.
-export %inline
+export
 fsOpen :
      {auto l : UVLoop}
   -> String
@@ -69,111 +69,76 @@ fsOpen path f m act = do
     Left err => act (Left err) >> releaseFs fs
     Right _  => pure ()
 
--- --------------------------------------------------------------------------------
--- -- File Reading
--- --------------------------------------------------------------------------------
---
--- public export
--- data ReadRes : (a : Type) -> Type where
---   Err    : UVError -> ReadRes s
---   NoData : ReadRes a
---   Data   : a -> ReadRes a
---
--- export
--- Functor ReadRes where
---   map f (Err e)  = Err e
---   map f NoData   = NoData
---   map f (Data v) = Data $ f v
---
--- export
--- Foldable ReadRes where
---   foldl acc v (Err e)  = v
---   foldl acc v NoData   = v
---   foldl acc v (Data x) = acc v x
---
---   foldr acc v (Err e)  = v
---   foldr acc v NoData   = v
---   foldr acc v (Data x) = acc x v
---
---   foldMap f (Err e)  = neutral
---   foldMap f NoData   = neutral
---   foldMap f (Data x) = f x
---
---   toList (Err e)  = []
---   toList NoData   = []
---   toList (Data x) = [x]
---
--- export
--- Traversable ReadRes where
---   traverse f (Err e)  = pure $ Err e
---   traverse f NoData   = pure NoData
---   traverse f (Data x) = Data <$> f x
---
--- export
--- codeToRes : Int32 -> ReadRes Bits32
--- codeToRes 0 = NoData
--- codeToRes n = if n < 0 then Err (fromCode n) else Data (cast n)
---
--- readRes : HasIO io => Ptr Buf -> Ptr Fs -> io (ReadRes ByteString)
--- readRes buf fs = do
---   c <- uv_fs_get_result fs
---   traverse (toByteString buf) (codeToRes c)
---
--- readAndReleaseRes : HasIO io => Ptr Buf -> Ptr Fs -> io (ReadRes ByteString)
--- readAndReleaseRes buf fs = do
---   res <- readRes buf fs
---   freeBuf buf
---   releaseFs fs
---   pure res
---
--- ||| Asynchronously reads up to the given number of bytes from the given file.
--- export
--- fsReadBytes :
---      {auto l : UVLoop}
---   -> (file   : File)
---   -> (bytes  : Bits32)
---   -> (cb     : ReadRes ByteString -> IO ())
---   -> IO ()
--- fsReadBytes f bytes cb = do
---   fr  <- mallocPtr Fs
---   buf <- mallocBuf bytes
---   res <- uv_fs_read l.loop fr f.file buf 1 0 $ \fr =>
---     readAndReleaseRes buf fr >>= cb
---   case uvRes res of
---     Left err => freeBuf buf >> releaseFs fr >> cb (Err err)
---     _        => pure ()
---
--- ||| Tries to open the given file and to
--- ||| asynchronously read up to the given number of bytes.
--- export
--- readBytes :
---      {auto l : UVLoop}
---   -> (path   : String)
---   -> (bytes  : Bits32)
---   -> (cb     : ReadRes ByteString -> IO ())
---   -> UVIO ()
--- readBytes path bytes cb =
---   fsOpen path RDONLY neutral $
---     \case Left err => cb (Err err)
---           Right f  => fsReadBytes f bytes (\r => fsClose f >> cb r)
---
--- ||| Tries to open the given file and to
--- ||| asynchronously read up to the given number of bytes.
--- |||
--- ||| The data read is interpreted as a UTF8-encoded string.
--- export %inline
--- readText :
---      {auto l : UVLoop}
---   -> (path   : String)
---   -> (bytes  : Bits32)
---   -> (cb     : ReadRes String -> IO ())
---   -> UVIO ()
--- readText path bytes cb =
---   readBytes path bytes (cb . map toString)
+export
+openFile :
+     {auto l : UVLoop}
+  -> String
+  -> Flags
+  -> Mode
+  -> Source [UVError] (IO (), File)
+openFile path fs m = MkSource $ do
+  ref <- sourceRef [UVError] (IO (), File) (pure ())
+  pure $ coldSrc ref $ \cb => fsOpen path fs m $ \case
+    Left err => cb (Err $ inject err)
+    Right p  => cb (Done [p])
+
+--------------------------------------------------------------------------------
+-- File Reading
+--------------------------------------------------------------------------------
+
+codeToMsg : Int32 -> Msg [UVError] Bits32
+codeToMsg 0 = Done []
+codeToMsg n = if n < 0 then Err (inject $ fromCode n) else Next [cast n]
+
+readRes : Ptr Buf -> Ptr Fs -> IO (Msg [UVError] ByteString)
+readRes buf fs = do
+  c <- uv_fs_get_result fs
+  traverse (toByteString buf) (codeToMsg c)
+
+export
+readBytes :
+     {auto l : UVLoop}
+  -> (file   : File)
+  -> (close  : IO ())
+  -> (buffer : Bits32)
+  -> Source [UVError] ByteString
+readBytes f close buffer = MkSource $ do
+  fs  <- mallocPtr Fs
+  buf <- mallocBuf buffer
+  ref <- sourceRef [UVError] ByteString (releaseFs fs >> freeBuf buf >> close)
+  pure (coldSrc ref $ read fs buf)
+    where
+      read : Ptr Fs -> Ptr Buf -> Callback [UVError] ByteString -> IO ()
+      read fs buf cb = do
+        setBufLen buf buffer
+        res <- uv_fs_read l.loop fs f.file buf 1 (-1)
+          (\p => readRes buf p >>= cb)
+        case uvRes res of
+          Left err => cb (Err $ inject err)
+          Right () => pure ()
+
+export
+readStdIn : UVLoop => Source [UVError] ByteString
+readStdIn = readBytes stdin (pure ()) 4096
+
+export covering
+readFile : UVLoop => (path : String) -> Source [UVError] ByteString
+readFile path =
+  openFile path RDONLY 0 |> flatMap (\(cl,f) => readBytes f cl 0xfffff)
 
 --------------------------------------------------------------------------------
 -- File Writing
 --------------------------------------------------------------------------------
+
+export
+printErrs : (l : UVLoop) => (ps : All Interpolation es) => Pipe es [] a a
+printErrs =
+  handle $ \es => do
+    fs <- mallocPtr Fs
+    let s := collapse' $ hzipWith (\_,e => interpolate e) ps es
+    buf <- fromByteString (fromString s)
+    ignore $ uv_fs_write l.loop fs stderr.file buf 1 (-1)
+      (\p => freeBuf buf >> releaseFs p)
 
 export
 writeBytes :
@@ -233,7 +198,7 @@ appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
 ||| Sink that writes all bytes to `stdout`.
 export %inline
 bytesOut : UVLoop => Sink [] ByteString
-bytesOut = writeBytes (\f => f $ Right (pure (), stdout)) 0 (\_ => pure ())
+bytesOut = writeBytes (\f => f $ Right (pure (), stdout)) (-1) (\_ => pure ())
 
 ||| Sink that writes all text to `stdout`.
 export %inline
