@@ -278,4 +278,4 @@ errorMsg = uv_strerror . toCode
 
 export %inline
 Interpolation UVError where
-  interpolate err = "{errorMsg err} ({show err})"
+  interpolate err = "\{errorMsg err} (\{show err})"

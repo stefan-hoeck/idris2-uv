@@ -8,11 +8,18 @@ import Data.String
 import Data.Buffer.Indexed
 import System.Rx
 import System.UV
+import System
+
+fileNames : List String -> List String
+fileNames (_::t) = t
+fileNames []     = []
 
 read : IO ()
-read =
+read = do
+  args <- getArgs
   runUV $
-       readFile "/home/gundi/documents/zinc/zinc2.smi"
+       batch (fileNames args)
+    |> flatMap readFile
     |> printErrs
     |>> toFile "/home/gundi/idris/uv/out.smi"
 
