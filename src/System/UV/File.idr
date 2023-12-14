@@ -124,7 +124,7 @@ readStdIn = readBytes stdin (pure ()) 4096
 export covering
 readFile : UVLoop => (path : String) -> Source [UVError] ByteString
 readFile path =
-  openFile path RDONLY 0 |> flatMap (\(cl,f) => readBytes f cl 0xfffff)
+  openFile path RDONLY 0 |> flatMap (\(cl,f) => readBytes f cl 0xffff)
 
 --------------------------------------------------------------------------------
 -- File Writing

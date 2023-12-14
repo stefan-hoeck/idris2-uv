@@ -14,14 +14,14 @@ fileNames : List String -> List String
 fileNames (_::t) = t
 fileNames []     = []
 
-read : IO ()
-read = do
+cat : IO ()
+cat = do
   args <- getArgs
   runUV $
-       batch (fileNames args)
-    |> flatMap readFile
-    |> printErrs
-    |>> toFile "/home/gundi/idris/uv/out.smi"
+        batch (fileNames args)
+    |>  flatMap readFile
+    |>  printErrs
+    |>> toFile "out.txt"
 
 timer : IO ()
 timer =
@@ -36,7 +36,7 @@ timer =
     |>> appendToFile "test.txt"
 
 main : IO ()
-main = read
+main = cat
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown
