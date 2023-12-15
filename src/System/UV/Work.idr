@@ -34,11 +34,12 @@ parSrc ref f (Just g) = request ref $ \m1 => do
   pa <- mallocPtr Async
   ti <- mallocPtr Timer
   ignore $ uv_timer_init l.loop ti
-  ignore $ uv_timer_start ti (\_ => pure ()) 10000 10000
+  ignore $ uv_timer_start ti (\_ => pure ()) 10 10
   ignore $ fork $ do
     m2 <- pure (mapMsg f m1)
     uv_async_init_and_send l.loop pa $ \x => do
       releaseHandle x
+      ignore $ uv_timer_stop ti
       releaseHandle ti
       when (isTerminal m1) (abort ref) -- upstream terminated, release resources
       when (isTerminal m2) (close ref) -- we terminated, send `Nothing` upstream
