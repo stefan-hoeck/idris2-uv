@@ -164,6 +164,7 @@ writeBytes openFile offset onErr = MkSink $ \fuel => do
       -> Callback [] ByteString
     cb Dry      sr fs h _ = close sr
 
+    cb (More x) sr fs h (Next []) = request sr (cb x sr fs h)
     cb (More x) sr fs h (Next vs) = do
       buf <- fromByteString (fastConcat vs)
       res <- uv_fs_write l.loop fs h.file buf 1 offset
@@ -172,6 +173,7 @@ writeBytes openFile offset onErr = MkSink $ \fuel => do
         Left err => close sr >> freeBuf buf >> onErr err
         _        => pure ()
 
+    cb _        sr fs h (Done []) = abort sr
     cb _        sr fs h (Done vs) = do
       buf <- fromByteString (fastConcat vs)
       res <- uv_fs_write l.loop fs h.file buf 1 offset

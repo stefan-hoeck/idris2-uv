@@ -1,5 +1,6 @@
 module System.Rx.Msg
 
+import Data.DPair
 import public Data.List.Quantifiers.Extra
 
 %default total
@@ -21,6 +22,45 @@ weaken : Msg [] a -> Msg es a
 weaken (Next vs) = Next vs
 weaken (Done vs) = Done vs
 weaken (Err err) impossible
+
+--------------------------------------------------------------------------------
+-- Valid Continuation
+--------------------------------------------------------------------------------
+
+||| Proof that message `m2` is a valid continuation of message `m1`.
+|||
+||| We use this for the most general form of sequentially converting
+||| messages to make sure that the information that an upstream source
+||| is exhausted (either because it stopped producing values or because
+||| it failed with an error) is not being lost sending data downstream.
+public export
+data ValidContinuation : (m1 : Msg es a) -> (m2 : Msg fs b) -> Type where
+  NextToNext : ValidContinuation (Next vs) (Next ws)
+  AnyToDone  : ValidContinuation m1 (Done vs)
+  AnyToErr   : ValidContinuation m1 (Err x)
+
+||| Valid sequential result of processing a message
+public export
+0 ValidAfter : Msg es a -> List Type -> Type -> Type
+ValidAfter m fs b = Subset (Msg fs b) (ValidContinuation m)
+
+||| Utility for creating a valid `Next` message as a convertion
+||| of initial message `m`.
+export %inline
+vnext : (vs : List a) -> ValidAfter (Next ws) es a
+vnext vs = Element (Next vs) NextToNext
+
+||| Utility for creating a valid `Done` message as a convertion
+||| of initial message `m`.
+export %inline
+vdone : (vs : List a) -> ValidAfter m es a
+vdone vs = Element (Done vs) AnyToDone
+
+||| Utility for creating a valid `Err` message as a convertion
+||| of initial message `m`.
+export %inline
+verr : (x : HSum es) -> ValidAfter m es a
+verr x = Element (Err x) AnyToErr
 
 --------------------------------------------------------------------------------
 -- Implementations

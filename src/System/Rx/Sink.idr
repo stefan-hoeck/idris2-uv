@@ -87,7 +87,7 @@ closed ref =
 ||| Close a source, thus initializing its cleanup if necessary.
 |||
 ||| Unlike `close`, this will not send a message to the
-||| registered source.
+||| upstream source.
 export %inline
 abort : SinkRef es a -> IO ()
 abort ref = do

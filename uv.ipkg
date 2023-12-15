@@ -17,8 +17,6 @@ modules = System.UV
         , System.UV.Loop
         , System.UV.Pipe
         , System.UV.Pointer
-        , System.UV.Req
-        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP
@@ -41,9 +39,13 @@ modules = System.UV
         , System.Rx
         , System.Rx.Core
         , System.Rx.Msg
-        , System.Rx.Pipe
         , System.Rx.Sink
         , System.Rx.Source
+
+        , System.Rx.Pipe
+        , System.Rx.Pipe.Buffer
+        , System.Rx.Pipe.FlatMap
+        , System.Rx.Pipe.Sync
 
 sourcedir = "src"
 
