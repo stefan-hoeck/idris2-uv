@@ -38,6 +38,7 @@ parameters {auto l : UVLoop}
             when (isTerminal m1) (abort ref)
             when (isTerminal m2) (close ref)
             g m2
+    putStrLn "after working on thread"
     pure ()
 
   ||| Synchronous, sequential, and potentially effectful conversion
