@@ -32,6 +32,8 @@ resource management: Here is the *hello world* of libuv.
 module Docs.UV.Intro
 
 import Data.IORef
+import Data.Nat
+
 import System
 import System.UV
 import System.UV.File
@@ -39,8 +41,10 @@ import System.UV.Raw.Idle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pipe
 import System.UV.Raw.TCP
+import System.UV.Raw.Req
 import System.UV.Raw.Signal
 import System.UV.Raw.Stream
+import System.UV.Raw.Work
 
 %default total
 
@@ -606,6 +610,39 @@ also obvious that this kind of code is getting far too tedious to
 write. So, the next step will be to factor out certain reoccurring
 patterns and add a layer of proper immutable Idris types on top
 of it all. That's for the second part of the tutorial.
+
+### A TCP Client
+
+```idris
+work : Ptr Loop -> Ptr Timer -> IORef Nat -> Nat -> IO ()
+work l pt ref n = do
+  sleep 2
+  putStrLn "Hello from another thread: \{show n}"
+  pa     <- mallocPtr Async
+  uv_async_init_and_send l pa $ \x => do
+    modifyIORef ref pred
+    nl <- readIORef ref
+    putStrLn "Current count is \{show nl}, calling thread is \{show n}"
+    when (nl == 0) (ignore $ uv_timer_stop pt)
+    uv_close_sync x
+
+Threads : Nat
+Threads = 100
+
+workExample : IO ()
+workExample = do
+  ref  <- newIORef Threads
+  loop <- uv_default_loop
+  t    <- mallocPtr Timer
+  _    <- uv_timer_init loop t
+  for_ [1..Threads] $ \n => ignore (fork $ work loop t ref n)
+  _    <- uv_timer_start t (\_ => putStrLn "Hello from the timer") 10 10
+  _    <- uv_run loop (toCode Default)
+  pure ()
+
+main : IO ()
+main = workExample
+```
 
 <!-- vi: filetype=idris2:syntax=markdown
 -->
