@@ -6,6 +6,8 @@ module Docs.UV.Rx
 import Data.List
 import Data.String
 import Data.Buffer.Indexed
+import Data.ByteString
+import Data.ByteVect
 import System.Rx
 import System.UV
 import System.UV.Pipe
@@ -30,6 +32,10 @@ readIn = do
         streamStdin
     |>  printErrs
     |>  snocBuffer 0xffff
+    |>  lines
+    |>  count
+    |>  showLines
+    |>  bytes
     |>> toFile "out.txt"
 
 timer : IO ()

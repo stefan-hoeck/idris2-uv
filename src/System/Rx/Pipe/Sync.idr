@@ -188,6 +188,47 @@ export %inline
 accum : s -> (a -> s -> (s,b)) -> Pipe es es a b
 accum s f = accumTill s (\x => Just . f x)
 
+||| Accumulates all emitted value, emitting a single value once
+||| upstream is exhausted.
+export
+fold : (b -> a -> b) -> b -> Pipe es es a b
+fold f v =
+  mealyPipe v $ \m,b1 => case m of
+    Next vs => (foldl f b1 vs, vnext [])
+    Done vs => (b1, vdone [foldl f b1 vs])
+    Err x   => (b1,verr x)
+
+||| Sums up all emitted values.
+export %inline
+sum : Num a => Pipe es es a a
+sum = fold (+) 0
+
+||| Multiplies all emitted values
+export %inline
+product : Num a => Pipe es es a a
+product = fold (*) 1
+
+||| Counts all emitted values
+export %inline
+count : Pipe es es a Nat
+count = fold (\v,_ => S v) 0
+
+export
+average : Pipe es es Double (Maybe Double)
+average =
+  fold (\(n,v),x => (S n, x+v)) (0,0) >>>
+  map (\(c,v) => case c of 0 => Nothing; _ => Just (v / cast c))
+
+||| Appends values using the given semigroup
+export %inline
+concatFrom : Semigroup a => a -> Pipe es es a a
+concatFrom = fold (<+>)
+
+||| Appends values using the given monoid
+export %inline
+concat : Monoid a => Pipe es es a a
+concat = concatFrom neutral
+
 ||| Keep only the first `n` values in a stream.
 export %inline
 take : (n : Nat) -> Pipe es es a a
