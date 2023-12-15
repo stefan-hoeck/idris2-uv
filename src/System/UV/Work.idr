@@ -25,14 +25,14 @@ parameters {auto l : UVLoop}
   -- implementation of the downstream side of a synchronous pipe
   asyncSrc :
        SinkRef es a
+   -> Ptr Work
    -> ((m : Msg es a) -> IO (ValidAfter m fs b))
    -> Src fs b
-  asyncSrc ref f Nothing  = close ref
-  asyncSrc {fs} {b} ref f (Just g) = request ref $ \m1 => do
+  asyncSrc ref pw f Nothing  = close ref
+  asyncSrc {fs} {b} ref pw f (Just g) = request ref $ \m1 => do
     reslt <- newIORef {a = ValidAfter m1 fs b} (vdone [])
-    pw <- mallocPtr Work
     putStrLn "working on thread"
-    r  <- uv_queue_work l.loop pw (\_ => putStrLn "on thread") $ \_,_ => do
+    r  <- uv_queue_work l.loop pw (\_ => putStrLn "on thread" >> f m1 >>= writeIORef reslt) $ \_,_ => do
             Element m2 _ <- readIORef reslt
             putStrLn "Got a result"
             when (isTerminal m1) (abort ref)
@@ -55,8 +55,9 @@ parameters {auto l : UVLoop}
     -> Pipe es fs a b
   asyncPipe {es} {a} convert = MkPipe $ do
     conv <- convert
-    ref  <- sinkRef es a (pure ())
-    pure (sink ref, asyncSrc ref conv)
+    pw   <- mallocPtr Work
+    ref  <- sinkRef es a (freePtr pw)
+    pure (sink ref, asyncSrc ref pw conv)
 
   --------------------------------------------------------------------------------
   -- Pipes operating on lists of values
