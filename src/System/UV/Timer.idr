@@ -10,7 +10,7 @@ import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import public System.UV.Raw.Timer
+import System.UV.Raw.Timer
 
 %default total
 
