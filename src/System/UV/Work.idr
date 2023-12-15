@@ -33,7 +33,6 @@ parameters {auto l : UVLoop}
     pw <- mallocPtr Work
     r  <- uv_queue_work l.loop pw (\_ => f m1 >>= writeIORef reslt) $ \_,_ => do
             Element m2 _ <- readIORef reslt
-            freePtr pw
             when (isTerminal m1) (abort ref)
             when (isTerminal m2) (close ref)
             g m2
