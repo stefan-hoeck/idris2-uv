@@ -35,6 +35,7 @@ parSrc ref f (Just g) = request ref $ \m1 => do
   ignore $ fork $ do
     m2 <- pure (mapMsg f m1)
     uv_async_init_and_send l.loop pa $ \x => do
+      releaseHandle x
       when (isTerminal m1) (abort ref) -- upstream terminated, release resources
       when (isTerminal m2) (close ref) -- we terminated, send `Nothing` upstream
       g m2
