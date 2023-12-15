@@ -17,6 +17,7 @@ import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Work
+import System
 
 %default total
 
@@ -29,17 +30,16 @@ parameters {auto l : UVLoop}
    -> ((m : Msg es a) -> IO (ValidAfter m fs b))
    -> Src fs b
   asyncSrc ref pw f Nothing  = close ref
-  asyncSrc {fs} {b} ref pw f (Just g) = request ref $ \m1 => do
-    reslt <- newIORef {a = ValidAfter m1 fs b} (vdone [])
-    putStrLn "working on thread"
-    r  <- uv_queue_work l.loop pw (\_ => putStrLn "on thread" >> f m1 >>= writeIORef reslt) $ \_,_ => do
-            Element m2 _ <- readIORef reslt
-            putStrLn "Got a result"
-            when (isTerminal m1) (abort ref)
-            when (isTerminal m2) (close ref)
-            g m2
-    putStrLn "after working on thread"
-    pure ()
+  asyncSrc {fs} {b} ref pw f (Just g) = request ref $ \m1 =>
+    ignore $ fork $ do
+      pa           <- mallocPtr Async
+      Element m2 _ <- f m1
+      uv_async_init_and_send l.loop pa $ \x => do
+        uv_close_sync x
+        freePtr x
+        when (isTerminal m1) (abort ref)
+        when (isTerminal m2) (close ref)
+        g m2
 
   ||| Synchronous, sequential, and potentially effectful conversion
   ||| of messages.

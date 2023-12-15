@@ -5,6 +5,11 @@
 #include <string.h>
 #include <uv.h>
 
+void *uv_async_init_and_send(uv_loop_t *lp, uv_async_t *as, uv_async_cb cb) {
+    uv_async_init(lp, as, cb);
+    uv_async_send(as);
+}
+
 uv_buf_t uv_deref_buf(uv_buf_t *ptr) { return *ptr; }
 
 void *uv_set_buf_len(uv_buf_t *buf, unsigned int length) { buf->len = length; }
