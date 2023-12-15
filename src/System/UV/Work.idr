@@ -34,6 +34,7 @@ parSrc ref f (Just g) = request ref $ \m1 => do
   pa <- mallocPtr Async
   ti <- mallocPtr Timer
   ignore $ uv_timer_init l.loop ti
+  ignore $ uv_timer_start ti (\_ => pure ()) 10000 10000
   ignore $ fork $ do
     m2 <- pure (mapMsg f m1)
     uv_async_init_and_send l.loop pa $ \x => do
