@@ -32,7 +32,7 @@ parameters {auto l : UVLoop}
     reslt <- newIORef {a = ValidAfter m1 fs b} (vdone [])
     pw <- mallocPtr Work
     putStrLn "working on thread"
-    r  <- uv_queue_work l.loop pw (\_ => putStrLn "on thread" >> f m1 >>= writeIORef reslt) $ \_,_ => do
+    r  <- uv_queue_work l.loop pw (\_ => putStrLn "on thread") $ \_,_ => do
             Element m2 _ <- readIORef reslt
             putStrLn "Got a result"
             when (isTerminal m1) (abort ref)
