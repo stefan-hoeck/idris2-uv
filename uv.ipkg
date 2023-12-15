@@ -22,7 +22,6 @@ modules = System.UV
         , System.UV.TCP
         , System.UV.Timer
         , System.UV.Util
-        , System.UV.Work
 
         , System.UV.Raw.File
         , System.UV.Raw.Handle
@@ -36,7 +35,6 @@ modules = System.UV
         , System.UV.Raw.TCP
         , System.UV.Raw.Timer
         , System.UV.Raw.Util
-        , System.UV.Raw.Work
 
         , System.Rx
         , System.Rx.Core
