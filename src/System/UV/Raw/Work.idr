@@ -10,6 +10,9 @@ import System.UV.Raw.Util
 -- FFI
 --------------------------------------------------------------------------------
 
+%foreign (idris_uv "uv_async_prep")
+prim__uv_async_prep : Ptr Loop -> Ptr Async -> PrimIO ()
+
 %foreign (idris_uv "uv_async_init_and_send")
 prim__uv_async_init_and_send :
      Ptr Loop
@@ -21,6 +24,10 @@ prim__uv_async_init_and_send :
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
+
+export %inline
+uv_async_prep : {auto has : HasIO io} -> Ptr Loop -> Ptr Async -> io ()
+uv_async_prep l w = primIO $ prim__uv_async_prep l w
 
 export %inline
 uv_async_init_and_send :

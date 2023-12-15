@@ -31,6 +31,7 @@ parSrc : (l : UVLoop) => SinkRef es a -> (List a -> List b) -> Src es b
 parSrc ref f Nothing  = close ref
 parSrc ref f (Just g) = request ref $ \m1 => do
   pa <- mallocPtr Async
+  uv_async_prep l.loop pa
   ignore $ fork $ do
     m2 <- pure (mapMsg f m1)
     uv_async_init_and_send l.loop pa $ \x => do
