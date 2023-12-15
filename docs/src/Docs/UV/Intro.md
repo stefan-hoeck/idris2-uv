@@ -44,7 +44,6 @@ import System.UV.Raw.TCP
 import System.UV.Raw.Req
 import System.UV.Raw.Signal
 import System.UV.Raw.Stream
-import System.UV.Raw.Work
 
 %default total
 
