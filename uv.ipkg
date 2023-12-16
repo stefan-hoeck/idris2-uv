@@ -7,6 +7,7 @@ depends = base >= 0.6.0
         , uv-data
         , elab-util
         , bytestring
+        , quantifiers-extra
 
 modules = System.UV
         , System.UV.DNS
@@ -16,13 +17,12 @@ modules = System.UV
         , System.UV.Loop
         , System.UV.Pipe
         , System.UV.Pointer
-        , System.UV.Req
-        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP
         , System.UV.Timer
         , System.UV.Util
+        , System.UV.Work
 
         , System.UV.Raw.File
         , System.UV.Raw.Handle
@@ -36,6 +36,17 @@ modules = System.UV
         , System.UV.Raw.TCP
         , System.UV.Raw.Timer
         , System.UV.Raw.Util
+
+        , System.Rx
+        , System.Rx.Core
+        , System.Rx.Msg
+        , System.Rx.Sink
+        , System.Rx.Source
+
+        , System.Rx.Pipe
+        , System.Rx.Pipe.Buffer
+        , System.Rx.Pipe.FlatMap
+        , System.Rx.Pipe.Sync
 
 sourcedir = "src"
 

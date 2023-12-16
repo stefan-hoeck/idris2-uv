@@ -13,10 +13,10 @@ import System.UV.Raw.Util
 %foreign (idris_uv "uv_cancel")
 prim__uv_cancel : Ptr Req -> PrimIO Int32
 
-%foreign (idris_uv "uv_cancel")
+%foreign (idris_uv "uv_req_get_data")
 prim__uv_req_get_data : Ptr Req -> PrimIO AnyPtr
 
-%foreign (idris_uv "uv_cancel")
+%foreign (idris_uv "uv_req_set_data")
 prim__uv_req_set_data : Ptr Req -> AnyPtr -> PrimIO ()
 
 --------------------------------------------------------------------------------

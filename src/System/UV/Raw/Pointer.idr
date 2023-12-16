@@ -4,6 +4,7 @@ import Data.Buffer
 import Derive.Prelude
 import System.UV.Raw.Util
 import public System.FFI
+import public System.UV.Data.Pointer
 
 %language ElabReflection
 %default total
@@ -68,99 +69,6 @@ uv_copy_from_buf : Buffer -> Ptr Bits8 -> Bits32 -> PrimIO ()
 
 %foreign "scheme:blodwen-buffer-getstring"
 uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
-
-export %foreign (idris_uv "uv_loop_sz")
-uv_loop_sz : Bits32
-
-export %foreign (idris_uv "uv_async_sz")
-uv_async_sz : Bits32
-
-export %foreign (idris_uv "uv_check_sz")
-uv_check_sz : Bits32
-
-export %foreign (idris_uv "uv_fs_event_sz")
-uv_fs_event_sz : Bits32
-
-export %foreign (idris_uv "uv_fs_poll_sz")
-uv_fs_poll_sz : Bits32
-
-export %foreign (idris_uv "uv_handle_sz")
-uv_handle_sz : Bits32
-
-export %foreign (idris_uv "uv_idle_sz")
-uv_idle_sz : Bits32
-
-export %foreign (idris_uv "uv_named_pipe_sz")
-uv_namedpipe_sz : Bits32
-
-export %foreign (idris_uv "uv_poll_sz")
-uv_poll_sz : Bits32
-
-export %foreign (idris_uv "uv_prepare_sz")
-uv_prepare_sz : Bits32
-
-export %foreign (idris_uv "uv_process_sz")
-uv_process_sz : Bits32
-
-export %foreign (idris_uv "uv_stream_sz")
-uv_stream_sz : Bits32
-
-export %foreign (idris_uv "uv_tcp_sz")
-uv_tcp_sz : Bits32
-
-export %foreign (idris_uv "uv_timer_sz")
-uv_timer_sz : Bits32
-
-export %foreign (idris_uv "uv_tty_sz")
-uv_tty_sz : Bits32
-
-export %foreign (idris_uv "uv_udp_sz")
-uv_udp_sz : Bits32
-
-export %foreign (idris_uv "uv_signal_sz")
-uv_signal_sz : Bits32
-
-export %foreign (idris_uv "uv_req_sz")
-uv_req_sz : Bits32
-
-export %foreign (idris_uv "uv_connect_sz")
-uv_connect_sz : Bits32
-
-export %foreign (idris_uv "uv_write_sz")
-uv_write_sz : Bits32
-
-export %foreign (idris_uv "uv_shutdown_sz")
-uv_shutdown_sz : Bits32
-
-export %foreign (idris_uv "uv_upd_send_sz")
-uv_upd_send_sz : Bits32
-
-export %foreign (idris_uv "uv_fs_sz")
-uv_fs_sz : Bits32
-
-export %foreign (idris_uv "uv_work_sz")
-uv_work_sz : Bits32
-
-export %foreign (idris_uv "uv_getaddrinfo_sz")
-uv_getaddrinfo_sz : Bits32
-
-export %foreign (idris_uv "uv_getnameinfo_sz")
-uv_getnameinfo_sz : Bits32
-
-export %foreign (idris_uv "uv_sockaddr_in_sz")
-uv_sockaddr_in_sz : Bits32
-
-export %foreign (idris_uv "uv_sockaddr_in6_sz")
-uv_sockaddr_in6_sz : Bits32
-
-export %foreign (idris_uv "uv_sockaddr_sz")
-uv_sockaddr_sz : Bits32
-
-export %foreign (idris_uv "uv_addrinfo_sz")
-uv_addrinfo_sz : Bits32
-
-export %foreign (idris_uv "uv_buf_sz")
-uv_buf_sz : Bits32
 
 --------------------------------------------------------------------------------
 -- Handles
@@ -271,36 +179,36 @@ data SockAddrIn6 : Type where
 public export
 data PSize : (a : Type) -> (s : Bits32) -> Type where
   [search a]
-  ASYNC          : PSize Async Pointer.uv_async_sz
-  CHECK          : PSize Check Pointer.uv_check_sz
-  FS_EVENT       : PSize FsEvent Pointer.uv_fs_event_sz
-  FS_POLL        : PSize FsPoll Pointer.uv_fs_poll_sz
-  HANDLE         : PSize Handle Pointer.uv_handle_sz
-  IDLE           : PSize Idle Pointer.uv_idle_sz
-  NAMEDPIPE      : PSize Pipe Pointer.uv_namedpipe_sz
-  POLL           : PSize Poll Pointer.uv_poll_sz
-  PREPARE        : PSize Prepare Pointer.uv_prepare_sz
-  PROCESS        : PSize Process Pointer.uv_process_sz
-  STREAM         : PSize Stream Pointer.uv_stream_sz
-  TCP            : PSize Tcp Pointer.uv_tcp_sz
-  TIMER          : PSize Timer Pointer.uv_timer_sz
-  TTY            : PSize Tty Pointer.uv_tty_sz
-  UDP            : PSize Udp Pointer.uv_udp_sz
-  SIGNAL         : PSize Signal Pointer.uv_signal_sz
-  REQ            : PSize Req Pointer.uv_req_sz
-  CONNECT        : PSize Connect Pointer.uv_connect_sz
-  WRITE          : PSize Write Pointer.uv_write_sz
-  SHUTDOWN       : PSize Shutdown Pointer.uv_shutdown_sz
-  FS             : PSize Fs Pointer.uv_fs_sz
-  WORK           : PSize Work Pointer.uv_work_sz
-  GETADDRINFO    : PSize GetAddrInfo Pointer.uv_getaddrinfo_sz
-  GETNAMEINFO    : PSize GetNameInfo Pointer.uv_getnameinfo_sz
-  ADDRINFO       : PSize AddrInfo Pointer.uv_addrinfo_sz
-  SOCKADDR       : PSize SockAddr Pointer.uv_sockaddr_sz
-  SOCKADDRIN     : PSize SockAddrIn Pointer.uv_sockaddr_in_sz
-  SOCKADDRIN6    : PSize SockAddrIn6 Pointer.uv_sockaddr_in6_sz
-  BUF            : PSize Buf Pointer.uv_buf_sz
-  LOOP           : PSize Loop Pointer.uv_loop_sz
+  ASYNC          : PSize Async SZ_ASYNC
+  CHECK          : PSize Check SZ_CHECK
+  FS_EVENT       : PSize FsEvent SZ_FS_EVENT
+  FS_POLL        : PSize FsPoll SZ_FS_POLL
+  HANDLE         : PSize Handle SZ_HANDLE
+  IDLE           : PSize Idle SZ_IDLE
+  NAMEDPIPE      : PSize Pipe SZ_NAMED_PIPE
+  POLL           : PSize Poll SZ_POLL
+  PREPARE        : PSize Prepare SZ_PREPARE
+  PROCESS        : PSize Process SZ_PROCESS
+  STREAM         : PSize Stream SZ_STREAM
+  TCP            : PSize Tcp SZ_TCP
+  TIMER          : PSize Timer SZ_TIMER
+  TTY            : PSize Tty SZ_TTY
+  UDP            : PSize Udp SZ_UDP
+  SIGNAL         : PSize Signal SZ_SIGNAL
+  REQ            : PSize Req SZ_REQ
+  CONNECT        : PSize Connect SZ_CONNECT
+  WRITE          : PSize Write SZ_WRITE
+  SHUTDOWN       : PSize Shutdown SZ_SHUTDOWN
+  FS             : PSize Fs SZ_FS
+  WORK           : PSize Work SZ_WORK
+  GETADDRINFO    : PSize GetAddrInfo SZ_GETADDRINFO
+  GETNAMEINFO    : PSize GetNameInfo SZ_GETNAMEINFO
+  ADDRINFO       : PSize AddrInfo SZ_ADDRINFO
+  SOCKADDR       : PSize SockAddr SZ_SOCKADDR
+  SOCKADDRIN     : PSize SockAddrIn SZ_SOCKADDR_IN
+  SOCKADDRIN6    : PSize SockAddrIn6 SZ_SOCKADDR_IN6
+  BUF            : PSize Buf SZ_BUF
+  LOOP           : PSize Loop SZ_LOOP
   BYTE           : PSize Bits8 1
   CHAR           : PSize Char 1
 

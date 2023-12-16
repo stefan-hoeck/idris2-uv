@@ -5,47 +5,30 @@
 ||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
+import System.Rx
 import System.UV.Error
 import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Resource
-import public System.UV.Raw.Timer
+import System.UV.Raw.Timer
 
 %default total
 
-||| Invokes the given IO action every `repeat` milliseconds, the first time
+||| Sends a signal every `repeat` milliseconds, the first time
 ||| after `timeout` has passed.
 |||
-||| Execution can be stopped whenever the returned `Resource` is released.
-||| The release handle is also passed to the callback, so that execution can
-||| be stopped from there as well.
+||| This will create a "hot" source that will emit events no
+||| matter if callbacks are registered or not. Consider using
+||| a pipe for buffering it this produces events faster than
+||| downstream can consume.
 export
-timer :
-     {auto l : UVLoop}
-  -> (timeout,repeat : Bits64)
-  -> (Resource -> IO ())
-  -> UVIO Resource 
-timer t r act = do
+timer : (l : UVLoop) => (timeout,repeat : Bits64) -> Source [UVError] ()
+timer t r = MkSource $ do
   h   <- mallocPtr Timer
-  uvio $ uv_timer_init l.loop h
-  res <- manageHandle h
-  uvio $ uv_timer_start h (\_ => act res) t r
-  pure res
-
-||| Invokes the given IO action every `repeat` milliseconds, the first time
-||| after `timeout` has passed.
-|||
-||| Execution can be stopped whenever the returned `Resource` is released.
-export %inline
-repeatedly : (l : UVLoop) => (timeout,repeat : Bits64) -> IO () -> UVIO Resource 
-repeatedly t r = timer t r . const
-
-||| Invokes the given IO action after `timeout` milliseconds.
-|||
-||| Execution can be aborted whenever the returned `Resource` is released.
-||| Note: All resources are freed automatically
-|||       after the IO action has been resolved.
-export %inline
-delayed : (l : UVLoop) => (timeout : Bits64) -> IO () -> UVIO Resource 
-delayed t act = timer t 0 (\res => act >> release res)
+  ref <- sourceRef [UVError] () (releaseHandle h)
+  r1 <- uv_timer_init l.loop h
+  r2 <- uv_timer_start h (\_ => emit1 ref ()) t r
+  case uvRes r1 >> uvRes r2 of
+    Left e   => error ref e
+    Right () => pure ()
+  pure $ hotSrc ref

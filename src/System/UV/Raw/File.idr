@@ -264,7 +264,7 @@ prim__uv_fs_read :
   -> (file   : Int32)
   -> (bufs   : Ptr Buf)
   -> (nbufs  : Bits32)
-  -> (offset : Int32)
+  -> (offset : Int64)
   -> (cb     : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
@@ -698,7 +698,7 @@ parameters {auto has : HasIO io}
     -> (file   : Int32)
     -> (bufs   : Ptr Buf)
     -> (nbufs  : Bits32)
-    -> (offset : Int32)
+    -> (offset : Int64)
     -> (cb     : Ptr Fs -> IO ())
     -> io Int32
   uv_fs_read l f h bufs nbufs offset act =
