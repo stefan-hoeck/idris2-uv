@@ -40,10 +40,12 @@ import System.UV.File
 import System.UV.Raw.Idle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pipe
-import System.UV.Raw.TCP
 import System.UV.Raw.Req
 import System.UV.Raw.Signal
 import System.UV.Raw.Stream
+import System.UV.Raw.TCP
+import System.UV.Raw.Timer
+import System.UV.Work
 
 %default total
 
@@ -609,6 +611,69 @@ also obvious that this kind of code is getting far too tedious to
 write. So, the next step will be to factor out certain reoccurring
 patterns and add a layer of proper immutable Idris types on top
 of it all. That's for the second part of the tutorial.
+
+```idris
+Total : Integer
+Total = 10000
+
+-- this computation will be run asynchronously
+-- in one of the worker threads of the event loop
+computeSum : Ptr Async -> IORef Integer -> Integer -> Integer -> IO ()
+computeSum pa ref nthreads i = do
+  putStrLn "In thread \{show i}"
+  let mult  := Total `div` nthreads
+      start := (i-1) * mult
+      stop  := i * mult - 1
+  writeIORef ref (sum $ map cast $ map show [start..stop])
+  putStrLn "Done in thread \{show i}"
+  ignore (uv_async_send pa)
+
+-- This will run in the event loop's main thread. It is therefore
+-- safe to use shared mutable state across all concurrent
+-- computations.
+-- in one of the worker threads of the event loop
+forkCompute :
+     Ptr Loop
+  -> Ptr Timer
+  -> IORef (Integer,Integer)
+  -> Integer
+  -> Integer
+  -> IO ThreadID
+forkCompute l pt tot nthreads i = do
+  pa  <- mallocPtr Async
+  ref <- newIORef 0
+  _   <- uv_async_init l pa $ \x => do
+           putStrLn "Got a result from thread \{show i}"
+           sum <- readIORef ref
+           modifyIORef tot $ \(x,y) => (x-1, y+sum)
+           uv_close_sync pa
+           freePtr pa
+           (threadsLeft,_) <- readIORef tot
+           when (threadsLeft == 0) (uv_close_sync pt >> freePtr pt)
+  putStrLn "Computing batch \{show i}"
+  fork (computeSum pa ref nthreads i)
+
+workExample : Integer -> IO ()
+workExample nthreads = do
+  loop   <- uv_default_loop
+  pt     <- mallocPtr Timer
+  _      <- uv_timer_init loop pt
+
+  _      <- uv_timer_start pt (\_ => putStrLn "tick") 5000 5000
+
+  tot    <- newIORef (nthreads, 0)
+  tids   <- traverse (forkCompute loop pt tot nthreads) [1..nthreads]
+
+  _      <- uv_run loop (toCode Default)
+  res    <- readIORef tot
+  putStrLn "Total: \{show res}"
+  printLn (length tids)
+
+main : IO ()
+main = do
+  [_,n] <- getArgs | _ => workExample 4
+  workExample (cast n)
+```
 
 <!-- vi: filetype=idris2:syntax=markdown
 -->

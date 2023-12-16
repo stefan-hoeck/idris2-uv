@@ -7,7 +7,7 @@ uv_buf_t uv_deref_buf(uv_buf_t *ptr);
 
 char *uv_get_buf_base(uv_buf_t *buf);
 
-unsigned int *uv_get_buf_len(uv_buf_t *buf);
+unsigned int uv_get_buf_len(uv_buf_t *buf);
 
 void *uv_set_buf_base(uv_buf_t *buf, char *dat);
 
@@ -107,5 +107,7 @@ uint64_t uv_get_f_ffree(uv_statfs_t *stat);
 int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
+
+int uv_queue_work_idris(uv_loop_t *loop, uv_work_t *req, uv_work_cb work_cb, uv_after_work_cb after_work_cb);
 
 #endif // SUPPORT_IDRIS2_UV_H_
