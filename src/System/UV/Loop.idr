@@ -29,6 +29,6 @@ runUV act = do
   loop <- defaultLoop
   act @{loop}
   res <- uv_run loop.loop (toCode Default)
-  case uvRes res of
-    Left err => die "\{err}"
-    Right _  => pure ()
+  case uvRes {es = [UVError]} res of
+    Left (Here err) => die "\{err}"
+    Right _         => pure ()

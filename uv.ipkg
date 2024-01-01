@@ -10,13 +10,16 @@ depends = base >= 0.6.0
         , quantifiers-extra
 
 modules = System.UV
+        , System.UV.Async
         , System.UV.DNS
         , System.UV.Error
         , System.UV.File
         , System.UV.Handle
+        , System.UV.Idle
         , System.UV.Loop
         , System.UV.Pipe
         , System.UV.Pointer
+        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP

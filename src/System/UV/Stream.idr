@@ -3,35 +3,44 @@ module System.UV.Stream
 import Data.Buffer.Indexed
 import Data.ByteString
 
-import System.Rx
-import System.UV.Error
-import System.UV.Handle
-import System.UV.Pointer
+import System.UV.Async
 import System.UV.Loop
+import System.UV.Pointer
+import System.UV.Resource
+import System.UV.Raw.Handle
 import public System.UV.Raw.Stream
 
 %default total
 
-toMsg : Int32 -> Ptr Buf -> IO (Msg [UVError] ByteString)
-toMsg n buf =
-  case uvRes n $> n of
-    Left EOF => pure (Done [])
-    Left err => pure (Err $ inject err)
-    Right n  => Next . pure <$> toByteString buf (cast n)
+public export
+data ReadRes : (a : Type) -> Type where
+  Done : ReadRes a
+  Data : (val : a) -> ReadRes a
+  Err  : UVError -> ReadRes a
 
-export
-streamRead :
-     {auto l : UVLoop}
-  -> (buffer : Bits32)
-  -> Ptr t
-  -> IO ()
-  -> {auto 0 cstt : PCast t Stream}
-  -> Source [UVError] ByteString
-streamRead buffer h cleanup = MkSource $ do
-  cs  <- mallocPtrs Bits8 buffer
-  ref <- sourceRef [UVError] ByteString (cleanup >> freePtr cs)
-  r   <- uv_read_start h (\_,_,b => initBuf b cs buffer) (\_,n,b => toMsg n b >>= send ref)
-  case uvRes r of
-    Left e   => error ref e
-    Right () => pure ()
-  pure $ hotSrc ref
+toMsg : Int32 -> Ptr Buf -> IO (ReadRes ByteString)
+toMsg n buf =
+  case uvRes {es = [UVError]} n $> n of
+    Left (Here EOF) => pure Done
+    Left (Here err) => pure (Err err)
+    Right n         => Data <$> toByteString buf (cast n)
+
+parameters {auto l : UVLoop}
+           {auto has : Has UVError es}
+
+  export
+  streamRead :
+       (buffer : Bits32)
+    -> Ptr t
+    -> {auto 0 cstt : PCast t Stream}
+    -> {auto res    : Resource (Ptr t)}
+    -> (Cancel -> ReadRes ByteString -> Async [] ())
+    -> Async es Cancel
+  streamRead buffer h run = do
+    cs  <- mallocPtrs Bits8 buffer
+    ccl <- mkCancel (release cs >> uv_read_stop h)
+    uvPar ccl (run ccl) $ \cb =>
+      uv_read_start
+        h
+        (\_,_,b => initBuf b cs buffer)
+        (\_,n,buf => toMsg n buf >>= cb)

@@ -1,26 +1,26 @@
 module System.UV.Signal
 
-import System.Rx
+import System.UV.Async
 import System.UV.Error
-import System.UV.Handle
+import System.UV.Resource
 import System.UV.Loop
 import System.UV.Pointer
 import public System.UV.Raw.Signal
 
 %default total
 
-||| Repeatedly reacts on process signals.
-export
-signal : (l : UVLoop) => SigCode -> Source [UVError] SigCode
-signal c = MkSource $ do
-  h   <- mallocPtr Signal
-  ref <- sourceRef [UVError] SigCode (releaseHandle h)
-  res <- uv_signal_init l.loop h
-  case uvRes res of
-    Left e   => error ref e
-    Right () => pure ()
-  pure $ coldSrc ref $ \cb => do
-    res <- uv_signal_start h (\_,_ => cb $ Next [c]) (sigToCode c)
-    case uvRes res of
-      Left e  => cb (Err $ inject e)
-      Right _ => pure ()
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+  export
+  mkSignal : Async es (Cancel, Ptr Signal)
+  mkSignal = do
+    pt <- mallocPtr Signal >>= uvAct (uv_signal_init l.loop)
+    c  <- mkCancel (ignore (uv_signal_stop pt) >> release pt)
+    pure (c, pt)
+
+  ||| Reacts on process signals.
+  export
+  onSignal : SigCode -> (SigCode -> Async [] ()) -> Async es Cancel
+  onSignal c run = do
+    (r,ps) <- mkSignal
+    uvPar1 r run $ \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)
