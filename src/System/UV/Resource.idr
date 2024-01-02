@@ -26,26 +26,6 @@ interface Resource a where
   release : HasIO io => a -> io ()
 
 export
-Resource (Ptr Idle) where
-  release h = uv_close h freePtr
-
-export
-Resource (Ptr Check) where
-  release h = uv_close h freePtr
-
-export
-Resource (Ptr Prepare) where
-  release h = uv_close h freePtr
-
-export
-Resource (Ptr Signal) where
-  release h = uv_close h freePtr
-
-export
-Resource (Ptr Timer) where
-  release h = uv_close h freePtr
-
-export
 Resource (Ptr Buf) where
   release = freeBuf
 

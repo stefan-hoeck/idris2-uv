@@ -5,9 +5,22 @@ import System.UV.Error
 import System.UV.Resource
 import System.UV.Loop
 import System.UV.Pointer
+import System.UV.Raw.Handle
 import public System.UV.Raw.Idle
 
 %default total
+
+export
+Resource (Ptr Idle) where
+  release h = uv_close h freePtr
+
+export
+Resource (Ptr Check) where
+  release h = uv_close h freePtr
+
+export
+Resource (Ptr Prepare) where
+  release h = uv_close h freePtr
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}

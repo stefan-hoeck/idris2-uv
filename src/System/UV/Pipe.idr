@@ -9,26 +9,36 @@ import System.UV.Pointer
 import System.UV.Resource
 import System.UV.Stream
 import System.UV.Util
+import System.UV.Raw.Handle
 import public System.UV.Raw.Pipe
+
+export
+Resource (Ptr Pipe) where
+  release h = uv_close h freePtr
 
 %default total
 
--- export
--- pipeOpen : (l : UVLoop) => File -> Source [UVError] (IO (), Ptr Pipe)
--- pipeOpen f =
---   lift1 $ do
---     pipe <- mallocPtr Pipe
---     r1   <- uv_pipe_init l.loop pipe False
---     r2   <- uv_pipe_open pipe f.file
---     case uvRes r1 >> uvRes r2 of
---       Left err => releaseHandle pipe $> Left (inject err)
---       Right () => pure $ Right (releaseHandle pipe, pipe)
---
--- export %inline
--- stdinOpen : (l : UVLoop) => Source [UVError] (IO (), Ptr Pipe)
--- stdinOpen = pipeOpen stdin
---
--- covering export %inline
--- streamStdin : (l : UVLoop) => Source [UVError] ByteString
--- streamStdin = stdinOpen |> flatMap (\(io,p) => streamRead 0xffff p io)
---
+parameters {auto l : UVLoop}
+           {auto has : Has UVError es}
+
+  export
+  mkPipe : Bool -> Async es (Cancel, Ptr Pipe)
+  mkPipe b = do
+    pp <- mallocPtr Pipe >>= uvAct (\x => uv_pipe_init l.loop x b)
+    c  <- mkCancel (release pp)
+    pure (c, pp)
+
+  export
+  pipeOpen : File -> Async es (Cancel, Ptr Pipe)
+  pipeOpen f = do
+    (c,pp) <- mkPipe False
+    uv $ uv_pipe_open pp f.file
+    pure (c,pp)
+
+  export %inline
+  stdinOpen : Async es(Cancel, Ptr Pipe)
+  stdinOpen = pipeOpen stdin
+
+  -- export %inline
+  -- streamStdin : (l : UVLoop) => Source [UVError] ByteString
+  -- streamStdin = stdinOpen |> flatMap (\(io,p) => streamRead 0xffff p io)

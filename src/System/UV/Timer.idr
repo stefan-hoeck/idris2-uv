@@ -9,10 +9,15 @@ import System.UV.Async
 import System.UV.Error
 import System.UV.Loop
 import System.UV.Pointer
+import System.UV.Raw.Handle
 import System.UV.Raw.Timer
 import System.UV.Resource
 
 %default total
+
+export
+Resource (Ptr Timer) where
+  release h = uv_close h freePtr
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
