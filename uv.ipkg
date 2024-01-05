@@ -8,9 +8,18 @@ depends = base >= 0.6.0
         , elab-util
         , bytestring
         , quantifiers-extra
+        , containers
 
-modules = System.UV
-        , System.UV.Async
+modules = IO.Async
+        , IO.Async.Async
+        , IO.Async.CancelState
+        , IO.Async.Fiber
+        , IO.Async.MVar
+        , IO.Async.Outcome
+        , IO.Async.Resource
+        , IO.Async.Token
+
+        , System.UV
         , System.UV.DNS
         , System.UV.Error
         , System.UV.File
@@ -39,17 +48,6 @@ modules = System.UV
         , System.UV.Raw.TCP
         , System.UV.Raw.Timer
         , System.UV.Raw.Util
-
-        , System.Rx
-        , System.Rx.Core
-        , System.Rx.Msg
-        , System.Rx.Sink
-        , System.Rx.Source
-
-        , System.Rx.Pipe
-        , System.Rx.Pipe.Buffer
-        , System.Rx.Pipe.FlatMap
-        , System.Rx.Pipe.Sync
 
 sourcedir = "src"
 

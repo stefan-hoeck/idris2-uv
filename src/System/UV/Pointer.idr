@@ -1,5 +1,6 @@
 module System.UV.Pointer
 
+import IO.Async.Resource
 import Data.Buffer.Indexed
 import Data.ByteString
 import System.FFI
@@ -8,6 +9,18 @@ import System.UV.Util
 import public System.UV.Raw.Pointer
 
 %default total
+
+export %inline
+Resource (Ptr Buf) where
+  release = freeBuf
+
+export %inline
+Resource (Ptr Bits8) where
+  release = freePtr
+
+export %inline
+Resource (Ptr Char) where
+  release = freePtr
 
 --------------------------------------------------------------------------------
 -- String Conversions
