@@ -18,3 +18,32 @@ export
 toOutcome : Result es a -> Outcome es a
 toOutcome (Right v)   = Succeeded v
 toOutcome (Left errs) = Error errs
+
+export
+Functor (Outcome es) where
+  map f (Succeeded v) = Succeeded (f v)
+  map _ (Error v)     = Error v
+  map _ Canceled      = Canceled
+
+export
+Foldable (Outcome es) where
+  foldr f x (Succeeded v) = f v x
+  foldr f x _             = x
+
+  foldl f x (Succeeded v) = f x v
+  foldl f x _             = x
+
+  foldMap f (Succeeded v) = f v
+  foldMap f _             = neutral
+
+  toList (Succeeded v) = [v]
+  toList _             = []
+
+  null (Succeeded v) = False
+  null _             = True
+
+export
+Traversable (Outcome es) where
+  traverse f (Succeeded v) = Succeeded <$> f v
+  traverse _ (Error v)     = pure $ Error v
+  traverse _ Canceled      = pure Canceled

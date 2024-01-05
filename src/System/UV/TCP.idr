@@ -1,6 +1,5 @@
 module System.UV.TCP
 
-import System.UV.Async
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Stream

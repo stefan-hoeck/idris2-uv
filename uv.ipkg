@@ -21,14 +21,11 @@ modules = IO.Async
 
         , System.UV
         , System.UV.DNS
-        , System.UV.Error
         , System.UV.File
-        , System.UV.Handle
         , System.UV.Idle
         , System.UV.Loop
         , System.UV.Pipe
         , System.UV.Pointer
-        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP

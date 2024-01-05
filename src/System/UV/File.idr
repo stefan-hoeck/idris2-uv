@@ -4,11 +4,8 @@ import Data.Buffer
 import Data.Buffer.Indexed
 import Data.ByteString
 import Data.Maybe
-import System.UV.Async
-import System.UV.Error
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Resource
 import System.UV.Util
 
 import public System.UV.Raw.File
@@ -55,8 +52,8 @@ parameters {auto l   : UVLoop}
   fileOutcome cb p = do
     n <- uv_fs_get_result p
     if n < 0
-      then cb (Left . inject $ fromCode n)
-      else cb (Right $ MkFile n)
+      then cb (Error . inject $ fromCode n)
+      else cb (Succeeded $ MkFile n)
 
   ||| Asynchronously opens a file.
   export
@@ -86,8 +83,8 @@ Resource ReadBuffer where
   release = freeBuf . ptr
 
 codeToMsg : Has UVError es => Int32 -> Outcome es (Maybe Bits32)
-codeToMsg 0 = Right Nothing
-codeToMsg n = uvRes n $> (Just $ cast n)
+codeToMsg 0 = Succeeded Nothing
+codeToMsg n = toOutcome (uvRes n $> (Just $ cast n))
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
@@ -133,7 +130,7 @@ parameters {auto l   : UVLoop}
   writeBytesAt h offset bs =
     use [mallocPtr Fs, fromByteString bs] $ \[fs,buf] =>
       uvAsync $ \cb =>
-        uv_fs_write l.loop fs h.file buf 1 offset $ \_ => cb (Right ())
+        uv_fs_write l.loop fs h.file buf 1 offset $ \_ => cb (Succeeded ())
 
   export %inline
   writeBytes : File -> ByteString -> Async es ()

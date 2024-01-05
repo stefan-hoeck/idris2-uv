@@ -2,10 +2,7 @@ module System.UV.DNS
 
 import Derive.Prelude
 import System.FFI
-import System.UV.Async
-import System.UV.Error
 import System.UV.Pointer
-import System.UV.Resource
 import System.UV.Loop
 import System.UV.Util
 import public System.UV.Raw.DNS
@@ -51,8 +48,8 @@ parameters {auto l   : UVLoop}
     -> IO ()
   gaCB cb _ st pa = do
     case uvRes st of
-      Left err => uv_freeaddrinfo pa >> cb (Left err)
-      Right () => cb (Right pa)
+      Left err => uv_freeaddrinfo pa >> cb (Error err)
+      Right () => cb (Succeeded pa)
 
   export
   addrInfo : (node, service : String) -> SockInfo -> Async es (Ptr AddrInfo)

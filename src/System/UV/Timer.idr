@@ -5,13 +5,10 @@
 ||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
-import System.UV.Async
-import System.UV.Error
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Handle
 import System.UV.Raw.Timer
-import System.UV.Resource
 
 %default total
 
@@ -19,29 +16,29 @@ export
 Resource (Ptr Timer) where
   release h = uv_close h freePtr
 
+timer_stop : Ptr Timer -> Async [] ()
+timer_stop pt = ignore (uv_timer_stop pt) >> release pt
+
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
   export
-  mkTimer : Async es (Cancel, Ptr Timer)
-  mkTimer = do
-    pt <- mallocPtr Timer >>= uvAct (uv_timer_init l.loop)
-    c  <- mkCancel (ignore (uv_timer_stop pt) >> release pt)
-    pure (c, pt)
+  mkTimer : Async es (Ptr Timer)
+  mkTimer = mallocPtr Timer >>= uvAct (uv_timer_init l.loop)
 
   ||| Sends a signal every `repeat` milliseconds, the first time
   ||| after `timeout` has passed.
-  export
+  export covering
   repeatedly :
        (timeout,repeat : Bits64)
-    -> (Cancel -> Async [] ())
-    -> Async es Cancel
+    -> Async es (Maybe a)
+    -> Async es (Fiber es a)
   repeatedly t r run = do
-    (c,pt) <- mkTimer
-    uvPar c run $ \cb => uv_timer_start pt (\_ => cb c) t r
+    pt <- mkTimer
+    uvForever' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t r
 
   ||| Sends a signal after `timeout` has passed.
-  export
-  once : (timeout : Bits64) -> Async [] () -> Async es Cancel
+  export covering
+  once : (timeout : Bits64) -> Async es a -> Async es (Fiber es a)
   once t run = do
-    (c,pt) <- mkTimer
-    uvPar1' c run $ \cb => uv_timer_start pt (\_ => cb) t 0
+    pt <- mkTimer
+    uvOnce' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t 0

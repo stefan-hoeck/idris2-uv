@@ -1,18 +1,18 @@
 module System.UV.Loop
 
-import IO.Async
 import IO.Async.CancelState
 import IO.Async.MVar
 import IO.Async.Token
 
 import Data.IORef
 import System
-import System.UV.Error
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Idle
 
+import public IO.Async
+import public System.UV.Data.Error
 import public System.UV.Data.RunMode
 
 %default total
@@ -32,18 +32,6 @@ loopTokenGen @{l} = l.tg
 export %inline
 defaultLoop : IO UVLoop
 defaultLoop = [| MkLoop uv_default_loop newTokenGen |]
-
-||| Sets up the given application by registering it at the default loop
-||| and starting the loop afterwards.
-covering export
-runUV : (UVLoop => IO ()) -> IO ()
-runUV act = do
-  loop <- defaultLoop
-  act @{loop}
-  res <- uv_run loop.loop (toCode Default)
-  case uvRes {es = [UVError]} res of
-    Left (Here err) => die "\{err}"
-    Right _         => pure ()
 
 parameters {auto l : UVLoop}
 
@@ -73,6 +61,18 @@ parameters {auto l : UVLoop}
 parameters {auto has : Has UVError es}
 
   export
+  uvCheck : a -> Int32 -> Result es a
+  uvCheck v n = if n < 0 then Left (inject $ fromCode n) else Right v
+
+  export %inline
+  uvRes : Int32 -> Result es ()
+  uvRes = uvCheck ()
+
+  export
+  uv : IO Int32 -> Async es ()
+  uv = liftEither . map uvRes
+
+  export
   uvAct : Resource a => (a -> IO Int32) -> a -> Async es a
   uvAct f v = onAbort (uv $ f v) (release v) $> v
 
@@ -83,9 +83,9 @@ parameters {auto has : Has UVError es}
     -> (ptr : r)
     -> (close : r -> Async [] ())
     -> ((a -> IO ()) -> IO Int32)
-    -> Async es b
+    -> Async es (Fiber es b)
   uvForever to p close reg =
-    finally
+    start $ finally
       (forever $ \cb => do
          n <- reg (\va => onAsync (to va) cb)
          case uvRes n of
@@ -101,5 +101,54 @@ parameters {auto has : Has UVError es}
     -> (ptr : r)
     -> (close : r -> Async [] ())
     -> (IO () -> IO Int32)
-    -> Async es b
+    -> Async es (Fiber es b)
   uvForever' as p close reg = uvForever (const as) p close (\f => reg (f ()))
+
+  export covering
+  uvOnce :
+       {auto l : UVLoop}
+    -> (a -> Async es b)
+    -> (ptr : r)
+    -> (close : r -> Async [] ())
+    -> ((a -> IO ()) -> IO Int32)
+    -> Async es (Fiber es b)
+  uvOnce to p close reg =
+    start $ finally
+      (async $ \cb => do
+         n <- reg (\va => onAsync (to va) cb)
+         case uvRes n of
+           Left err => cb (Error err)
+           Right () => pure ()
+           )
+      (close p)
+
+  export covering
+  uvOnce' :
+       {auto l : UVLoop}
+    -> Async es b
+    -> (ptr : r)
+    -> (close : r -> Async [] ())
+    -> (IO () -> IO Int32)
+    -> Async es (Fiber es b)
+  uvOnce' as p close reg = uvOnce (const as) p close (\f => reg (f ()))
+
+  export
+  uvAsync : ((Outcome es a -> IO ()) -> IO Int32) -> Async es a
+  uvAsync f =
+    async $ \cb => do
+      n <- f cb
+      case uvRes n of
+        Left err => cb (Error err)
+        Right () => pure ()
+
+||| Sets up the given application by registering it at the default loop
+||| and starting the loop afterwards.
+covering export
+runUV : (UVLoop => IO ()) -> IO ()
+runUV act = do
+  loop <- defaultLoop
+  act @{loop}
+  res <- uv_run loop.loop (toCode Default)
+  case uvRes {es = [UVError]} res of
+    Left (Here err) => die "\{err}"
+    Right _         => pure ()

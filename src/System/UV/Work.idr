@@ -1,7 +1,5 @@
 module System.UV.Work
 
-import System.UV.Error
-import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Util
