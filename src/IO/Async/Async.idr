@@ -16,6 +16,7 @@ import IO.Async.Token
 
 export
 data Async : List Type -> Type -> Type where
+  Sync         : IO (Outcome es a) -> Async es a
   CB           : ((Outcome es a -> IO ()) -> IO ()) -> Async es a
   Forever      : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Async es a
   Bind         : Async es a -> (Outcome es a -> Async fs b) -> Async fs b
@@ -26,9 +27,33 @@ data Async : List Type -> Type -> Type where
   Uncancelable : Async es a -> Async es a
   Cancelable   : Async es a -> Async es a
 
+type : Async es a -> String
+type (Sync x) = "Sync"
+type (CB f) = "CB"
+type (Forever f) = "Forever"
+type (Bind x f) = "Bind"
+type (Start x) = "Start"
+type (Poll x) = "Poll"
+type Cancel = "Cancel"
+type (After x y) = "After"
+type (Uncancelable x) = "Uncancelable"
+type (Cancelable x) = "Cancelable"
+
+depth : Async es a -> Nat
+depth (Sync x) = 1
+depth (CB f) = 1
+depth (Forever f) = 1
+depth (Bind x f) = S $ depth x
+depth (Start x) = S $ depth x
+depth (Poll x) = 1
+depth Cancel = 1
+depth (After x y) = S $ depth x
+depth (Uncancelable x) = S $ depth x
+depth (Cancelable x) = S $ depth x
+
 public export
 0 Canceler : Type
-Canceler = {0 es : _} -> {0 a : _} -> Async es a -> Async es a
+Canceler = (0 es : _) -> (0 a : _) -> Async es a -> Async es a
 
 export %inline
 async : ((Outcome es a -> IO ()) -> IO ()) -> Async es a
@@ -39,16 +64,16 @@ forever : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Async es a
 forever = Forever
 
 export %inline
-lift : IO (Outcome es a) -> Async es a
-lift io = CB (io >>=)
+sync : IO (Outcome es a) -> Async es a
+sync = Sync
 
 export %inline
 liftEither : IO (Result es a) -> Async es a
-liftEither res = CB $ \cb => res >>= cb . toOutcome
+liftEither = sync . map toOutcome
 
 export %inline
 liftResult : Result es a -> Async es a
-liftResult res = CB $ \cb => cb (toOutcome res)
+liftResult = liftEither . pure
 
 export %inline
 succeed : a -> Async es a
@@ -56,7 +81,7 @@ succeed = liftResult . Right
 
 %inline
 canceled : Async es a
-canceled = lift . pure $ Canceled
+canceled = sync . pure $ Canceled
 
 export %inline
 delay : Lazy a -> Async es a
@@ -92,16 +117,28 @@ Monad (Async es) where
 
 export %inline
 HasIO (Async es) where
-  liftIO = lift . map Succeeded
+  liftIO = sync . map Succeeded
 
 export %inline
 uncancelable : (Canceler -> Async es a) -> Async es a
-uncancelable as = Uncancelable $ as Cancelable
+uncancelable as = Uncancelable $ as (\_,_ => Cancelable)
 
 export
 guarantee : Async es a -> (Outcome es a -> Async [] ()) -> Async es a
 guarantee as fun =
-  uncancelable $ \f => Bind (f as) (\o => Bind (fun o) (\_ => lift $ pure o))
+  uncancelable $ \f => Bind (f _ _ as) (\o => Bind (fun o) (\_ => sync $ pure o))
+
+export
+catch : (HSum es -> Async [] a) -> Async es a -> Async [] a
+catch f as =
+  Bind as $ \case
+    Succeeded a => pure a
+    Error err   => f err
+    Canceled    => canceled
+
+export
+handle : All (\x => x -> Async [] a) es -> Async es a -> Async [] a
+handle hs = catch (collapse' . hzipWith id hs)
 
 export
 onCancel : Async es a -> Async [] () -> Async es a
@@ -131,7 +168,7 @@ start : Async es a -> Async es (Fiber es a)
 start = Start
 
 export
-(.cancel) : Fiber es a -> Async [] ()
+(.cancel) : Fiber es a -> Async es ()
 (.cancel) f = do
   liftIO $
     for_ f.parent (\p => removeChild p f.token) >>
@@ -146,9 +183,6 @@ export
 -- Evaluation
 --------------------------------------------------------------------------------
 
-toOutcome : CancelState -> Either (Outcome es ()) b
-toOutcome cs = Left $ if stopped cs then Canceled else Succeeded ()
-
 public export
 record EvalST where
   constructor EST
@@ -157,20 +191,35 @@ record EvalST where
   fiber : Fiber errors result
   act   : Async errors result
 
+data EvalRes : (es : List Type) -> Type -> Type where
+  Cont : Async es a -> EvalRes es a
+  Cede : Async es a -> EvalRes es a
+  Done : Outcome es a -> EvalRes es a
+
+toRes : CancelState -> EvalRes es ()
+toRes cs = Done $ if stopped cs then Canceled else Succeeded ()
+
+doneType : Outcome es a -> String
+doneType (Succeeded res) = "Succeeded"
+doneType (Error err) = "Error"
+doneType Canceled = "Canceled"
+
+resDebugMsg : EvalRes es a -> String
+resDebugMsg (Cont x) = "Cont of type \{type x} and depth \{show $ depth x}"
+resDebugMsg (Cede x) = "Cede of type \{type x} and depth \{show $ depth x}"
+resDebugMsg (Done x) = "Done of type \{doneType x}"
+
 parameters {auto tg : TokenGen}
            (spawn  : IO (Maybe EvalST -> IO ()))
 
   covering
-  step : MVar CancelState -> Async es a -> IO (Either (Outcome es a) (Async es a))
+  step : MVar CancelState -> Async es a -> IO (EvalRes es a)
 
   covering
-  done : MVar CancelState -> Async es a -> IO (Either (Outcome es a) (Async es a))
+  done : MVar CancelState -> Async es a -> IO (EvalRes es a)
 
   covering
-  step' :
-       MVar CancelState
-    -> Async es a
-    -> IO (Either (Outcome es a) (Async es a))
+  step' : MVar CancelState -> Async es a -> IO (EvalRes es a)
   step' c act = do
     s <- readMVar c
     if stopped s then done c act else step c act
@@ -178,14 +227,19 @@ parameters {auto tg : TokenGen}
   export covering
   eval : (submit : Maybe EvalST -> IO ()) -> EvalST -> IO ()
   eval submit (EST f act) = do
-    Left o <- step' f.canceled act | Right act' => submit (Just $ EST f act')
-    ignore (complete f.outcome o)
-    submit Nothing
+    res <- step' f.canceled act
+    -- putStrLn (resDebugMsg res)
+    case res of
+      Cont act' => submit (Just $ EST f act')
+      Cede act' => submit (Just $ EST f act')
+      Done res  => ignore (complete f.outcome res) >> submit Nothing
+
+  step c (Sync io) = map Done io
 
   step c (CB f) = do
     var <- newDeferred
     f (ignore . complete var)
-    pure (Right $ Poll var)
+    pure (Cede $ Poll var)
 
   step c (Forever f) = do
     var <- newDeferred
@@ -194,65 +248,46 @@ parameters {auto tg : TokenGen}
       Succeeded Nothing  => pure ()
       Canceled           => ignore $ complete var Canceled
       Error err          => ignore $ complete var (Error err)
-    pure (Right $ Poll var)
+    pure (Cede $ Poll var)
 
   step c (Bind x f) = do
-    Left o <- step c x | Right as => pure (Right $ Bind as f)
-    pure (Right $ f o)
+    step c x >>= \case
+      Cont y => step c (Bind y f)
+      Cede y => pure (Cede $ Bind y f)
+      Done r => step c (f r)
 
-  step c (After x y) = do
-    Left o <- step c x | Right as => pure (Right $ After as y)
-    y $> Left o
+  step c (After x y) =
+    step c x >>= \case
+      Cont v => step c (After v y)
+      Cede v => pure (Cede $ After v y)
+      Done o => y $> Done o
 
   step c (Poll var) = do
-    Nothing <- tryGet var | Just v => pure (Left v)
-    pure (Right $ Poll var)
+    Nothing <- tryGet var | Just v => pure (Done v)
+    pure (Cede $ Poll var)
 
   step c (Start x) = do
     fbr <- newFiber (Just c)
     sub <- spawn
     ignore $ eval sub (EST fbr x)
-    pure (Left $ Succeeded fbr)
+    pure (Done $ Succeeded fbr)
 
-  step c (Uncancelable x) = inc c $> (Right $ After x (dec c))
+  step c (Uncancelable x) = inc c >> step c (After x (dec c))
 
-  step c (Cancelable x) = dec c $> (Right $ After x (inc c))
+  step c (Cancelable x) = dec c >> step c (After x (inc c))
 
-  step c Cancel = toOutcome <$> cancel c
+  step c Cancel = toRes <$> cancel c
 
-  done c (Bind x f) = do
-    Left o <- done c x | Right as => pure (Right $ Bind as f)
-    pure (Right $ f o)
-  done c (After x y) = do
-    Left o <- done c x | Right as => pure (Right $ After as y)
-    y $> Left o
-  done c _ = pure (Left Canceled)
+  done c (Bind x f) =
+    done c x >>= \case
+      Cont v => done c (Bind v f)
+      Cede v => pure (Cede $ Bind v f)
+      Done v => done c (f v)
 
--- fibo : Nat -> Async [] Nat
--- fibo 0 = pure 1
--- fibo 1 = pure 1
--- fibo (S $ S k) = [| fibo k + fibo (S k) |]
---
--- covering
--- counter : Integer -> Async [] ()
--- counter n = do
---   when (n `mod` 1000 == 0) (printLn n)
---   counter (n+1)
---
--- countDown : Nat -> Async [] ()
--- countDown 0     = putStrLn "Done"
--- countDown (S k) =
---   putStrLn "Countdown \{show $ S k}" >> countDown k
---
--- covering
--- main : IO ()
--- main =
---   runAsync $ do
---     for_ [1..1000] $ \x =>
---       ignore $ start (finally (countDown x) (putStrLn "\{show x} canceled"))
---     f1 <- start (fibo 10)
---     f2 <- start (fibo 10)
---     x1 <- f1.await
---     x2 <- f2.await
---     putStrLn "Results ready"
---     finally cancel (printLn (x1 + x2))
+  done c (After x y) =
+    done c x >>= \case
+      Cont v => done c (After v y)
+      Cede v => pure (Cede $ After v y)
+      Done v => y $> Done v
+
+  done c _ = pure (Done Canceled)

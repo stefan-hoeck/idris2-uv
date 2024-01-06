@@ -21,7 +21,7 @@ Resource (Ptr Prepare) where
   release p = uv_close p freePtr
 
 idle_stop : Ptr Idle -> Async [] ()
-idle_stop x = ignore (uv_idle_stop x) >> release x
+idle_stop x = putStrLn "stopping idle" >> ignore (uv_idle_stop x) >> release x
 
 check_stop : Ptr Check -> Async [] ()
 check_stop x = ignore (uv_check_stop x) >> release x

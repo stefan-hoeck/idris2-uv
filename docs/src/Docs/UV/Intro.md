@@ -37,6 +37,7 @@ import Data.Nat
 import System
 import System.UV
 import System.UV.File
+import System.UV.Raw.Handle
 import System.UV.Raw.Idle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pipe

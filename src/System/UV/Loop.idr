@@ -39,11 +39,11 @@ parameters {auto l : UVLoop}
   uvStep : IO (Maybe EvalST -> IO ())
   uvStep = do
     ref <- newIORef {a = Maybe EvalST} Nothing
-    pc  <- mallocPtr Check
-    r1  <- uv_check_init l.loop pc
-    r2  <- uv_check_start pc $ \_ => do
+    pc  <- mallocPtr Idle
+    r1  <- uv_idle_init l.loop pc
+    r2  <- uv_idle_start pc $ \_ => do
              Just st <- readIORef ref
-               | Nothing => ignore (uv_check_stop pc) >> uv_close pc freePtr
+               | Nothing => ignore (uv_idle_stop pc) >> uv_close pc freePtr
              eval uvStep (writeIORef ref) st
     pure (writeIORef ref)
 
@@ -148,6 +148,7 @@ runUV : (UVLoop => IO ()) -> IO ()
 runUV act = do
   loop <- defaultLoop
   act @{loop}
+  putStrLn "Starting event loop"
   res <- uv_run loop.loop (toCode Default)
   case uvRes {es = [UVError]} res of
     Left (Here err) => die "\{err}"
