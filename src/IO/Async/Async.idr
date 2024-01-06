@@ -31,13 +31,13 @@ type : Async es a -> String
 type (Sync x) = "Sync"
 type (CB f) = "CB"
 type (Forever f) = "Forever"
-type (Bind x f) = "Bind"
-type (Start x) = "Start"
+type (Bind x f) = "Bind of \{type x}"
+type (Start x) = "Start of \{type x}"
 type (Poll x) = "Poll"
 type Cancel = "Cancel"
-type (After x y) = "After"
-type (Uncancelable x) = "Uncancelable"
-type (Cancelable x) = "Cancelable"
+type (After x y) = "After of \{type x}"
+type (Uncancelable x) = "Uncancelable of \{type x}"
+type (Cancelable x) = "Cancelable of \{type x}"
 
 depth : Async es a -> Nat
 depth (Sync x) = 1
@@ -53,7 +53,7 @@ depth (Cancelable x) = S $ depth x
 
 public export
 0 Canceler : Type
-Canceler = (0 es : _) -> (0 a : _) -> Async es a -> Async es a
+Canceler = {0 es : _} -> {0 a : _} -> Async es a -> Async es a
 
 export %inline
 async : ((Outcome es a -> IO ()) -> IO ()) -> Async es a
@@ -121,12 +121,12 @@ HasIO (Async es) where
 
 export %inline
 uncancelable : (Canceler -> Async es a) -> Async es a
-uncancelable as = Uncancelable $ as (\_,_ => Cancelable)
+uncancelable as = Uncancelable $ as Cancelable
 
 export
 guarantee : Async es a -> (Outcome es a -> Async [] ()) -> Async es a
 guarantee as fun =
-  uncancelable $ \f => Bind (f _ _ as) (\o => Bind (fun o) (\_ => sync $ pure o))
+  uncancelable $ \f => Bind (f as) (\o => Bind (fun o) (\_ => sync $ pure o))
 
 export
 catch : (HSum es -> Async [] a) -> Async es a -> Async [] a
@@ -210,7 +210,7 @@ resDebugMsg (Cede x) = "Cede of type \{type x} and depth \{show $ depth x}"
 resDebugMsg (Done x) = "Done of type \{doneType x}"
 
 parameters {auto tg : TokenGen}
-           (spawn  : IO (Maybe EvalST -> IO ()))
+           (submit  : EvalST -> IO ())
 
   covering
   step : MVar CancelState -> Async es a -> IO (EvalRes es a)
@@ -225,14 +225,14 @@ parameters {auto tg : TokenGen}
     if stopped s then done c act else step c act
 
   export covering
-  eval : (submit : Maybe EvalST -> IO ()) -> EvalST -> IO ()
-  eval submit (EST f act) = do
+  eval : EvalST -> IO ()
+  eval (EST f act) = do
     res <- step' f.canceled act
     -- putStrLn (resDebugMsg res)
     case res of
-      Cont act' => submit (Just $ EST f act')
-      Cede act' => submit (Just $ EST f act')
-      Done res  => ignore (complete f.outcome res) >> submit Nothing
+      Cont act' => submit (EST f act')
+      Cede act' => submit (EST f act')
+      Done res  => ignore (complete f.outcome res)
 
   step c (Sync io) = map Done io
 
@@ -252,13 +252,13 @@ parameters {auto tg : TokenGen}
 
   step c (Bind x f) = do
     step c x >>= \case
-      Cont y => step c (Bind y f)
+      Cont y => step' c (Bind y f)
       Cede y => pure (Cede $ Bind y f)
-      Done r => step c (f r)
+      Done r => step' c (f r)
 
   step c (After x y) =
     step c x >>= \case
-      Cont v => step c (After v y)
+      Cont v => step' c (After v y)
       Cede v => pure (Cede $ After v y)
       Done o => y $> Done o
 
@@ -268,8 +268,7 @@ parameters {auto tg : TokenGen}
 
   step c (Start x) = do
     fbr <- newFiber (Just c)
-    sub <- spawn
-    ignore $ eval sub (EST fbr x)
+    ignore $ eval (EST fbr x)
     pure (Done $ Succeeded fbr)
 
   step c (Uncancelable x) = inc c >> step c (After x (dec c))
@@ -280,13 +279,13 @@ parameters {auto tg : TokenGen}
 
   done c (Bind x f) =
     done c x >>= \case
-      Cont v => done c (Bind v f)
+      Cont v => step' c (Bind v f)
       Cede v => pure (Cede $ Bind v f)
-      Done v => done c (f v)
+      Done v => step' c (f v)
 
   done c (After x y) =
     done c x >>= \case
-      Cont v => done c (After v y)
+      Cont v => step' c (After v y)
       Cede v => pure (Cede $ After v y)
       Done v => y $> Done v
 

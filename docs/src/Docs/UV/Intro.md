@@ -128,13 +128,13 @@ idleExample = do
   handle   <- mallocPtr Idle
   _        <- uv_idle_init loop handle
   ref      <- newIORef 0
-  _        <- uv_idle_start handle (checkCounter 100_000 ref)
+  _        <- uv_idle_start handle (checkCounter 1_000_000 ref)
   _        <- uv_run loop (toCode Default)
   _        <- uv_loop_close loop
   freePtr handle
 
--- main : IO ()
--- main = idleExample
+main : IO ()
+main = idleExample
 ```
 
 You can try the example above by uncommenting the `main` function
@@ -670,10 +670,10 @@ workExample nthreads = do
   putStrLn "Total: \{show res}"
   printLn (length tids)
 
-main : IO ()
-main = do
-  [_,n] <- getArgs | _ => workExample 4
-  workExample (cast n)
+-- main : IO ()
+-- main = do
+--   [_,n] <- getArgs | _ => workExample 4
+--   workExample (cast n)
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown

@@ -23,36 +23,37 @@ record UVLoop where
   constructor MkLoop
   loop : Ptr Loop
   tg   : TokenGen
+  ref  : IORef (List EvalST)
 
 export %inline %hint
 loopTokenGen : UVLoop => TokenGen
 loopTokenGen @{l} = l.tg
 
+register : IORef (List a) -> a -> IO ()
+register ref = modifyIORef ref . (::)
+
 ||| Returns the default loop, corresponding to `uv_default_loop`.
-export %inline
+export covering
 defaultLoop : IO UVLoop
-defaultLoop = [| MkLoop uv_default_loop newTokenGen |]
+defaultLoop = do
+  l   <- uv_default_loop
+  tg  <- newTokenGen
+  ref <- newIORef {a = List EvalST} []
+  pc  <- mallocPtr Idle
+  r1  <- uv_idle_init l pc
+  r2  <- uv_idle_start pc $ \x => do
+           readIORef ref >>= \case
+             [] => ignore (uv_idle_stop x) >> uv_close x freePtr
+             ss => writeIORef ref [] >> traverse_ (eval (register ref)) ss
+  pure $ MkLoop l tg ref
 
 parameters {auto l : UVLoop}
-
-  covering
-  uvStep : IO (Maybe EvalST -> IO ())
-  uvStep = do
-    ref <- newIORef {a = Maybe EvalST} Nothing
-    pc  <- mallocPtr Idle
-    r1  <- uv_idle_init l.loop pc
-    r2  <- uv_idle_start pc $ \_ => do
-             Just st <- readIORef ref
-               | Nothing => ignore (uv_idle_stop pc) >> uv_close pc freePtr
-             eval uvStep (writeIORef ref) st
-    pure (writeIORef ref)
 
   export covering
   onAsync : Async es a -> (Outcome es a -> IO ()) -> IO ()
   onAsync as cb = do
     fb  <- newFiber Nothing
-    stp <- uvStep
-    eval uvStep stp (EST fb $ guarantee as (liftIO . cb))
+    eval (register l.ref) (EST fb $ guarantee as (liftIO . cb))
 
   export covering %inline
   runAsync : Async [] () -> IO ()
