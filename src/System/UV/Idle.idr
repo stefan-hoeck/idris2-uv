@@ -4,7 +4,7 @@ import IO.Async
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Handle
-import public System.UV.Raw.Idle
+import System.UV.Raw.Idle
 
 %default total
 

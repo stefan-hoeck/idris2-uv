@@ -5,7 +5,7 @@ import System.FFI
 import System.UV.Pointer
 import System.UV.Loop
 import System.UV.Util
-import public System.UV.Raw.DNS
+import System.UV.Raw.DNS
 
 %language ElabReflection
 %default total
