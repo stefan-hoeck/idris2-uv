@@ -22,7 +22,12 @@ parameters {auto l   : UVLoop}
 
   ||| Reacts on process signals.
   export covering
-  onSignal : SigCode -> (SigCode -> Async es a) -> Async es (Fiber es a)
-  onSignal c run = do
+  onSignal' : SigCode -> (SigCode -> Async es a) -> Async es (Fiber es a)
+  onSignal' c run = do
     ps <- mkSignal
     uvOnce run ps signal_stop $ \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)
+
+  ||| Reacts on process signals.
+  export %inline covering
+  onSignal : SigCode -> Async es a -> Async es (Fiber es a)
+  onSignal c = onSignal' c . const

@@ -35,7 +35,7 @@ data Prim : List Type -> Type -> Type where
   Sync   : IO (Outcome es a) -> Prim es a
   CB     : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Prim es a
   Start  : Async es a -> Prim es (Fiber es a)
-  Poll   : Deferred (Outcome es a) -> Prim es a
+  Poll   : IO (Maybe $ Outcome es a) -> Prim es a
   Cancel : Prim es ()
 
 export
@@ -134,18 +134,22 @@ HasIO (Async es) where
 
 export
 cancelable : Async es a -> Async es a
-cancelable (AP _ x)     = AP P x
-cancelable (Bind _ x f) = Bind P x f
+cancelable (AP _ x)     = AP C x
+cancelable (Bind _ x f) = Bind C x f
 
 export
 uncancelable : Async es a -> Async es a
 uncancelable (AP _ x)     = AP U x
 uncancelable (Bind _ x f) = Bind U x f
 
+export %inline
+poll : IO (Maybe $ Outcome es a) -> Async es a
+poll = AP P . Poll
+
 export
 guarantee : Async es a -> (Outcome es a -> Async [] ()) -> Async es a
 guarantee as fun =
-  Bind P as (\o => Bind U (fun o) (\_ => sync $ pure o))
+  Bind U as (\o => Bind U (fun o) (\_ => sync $ pure o))
 
 export
 catch : (HSum es -> Async [] a) -> Async es a -> Async [] a
@@ -192,11 +196,26 @@ export
   liftIO $
     for_ f.parent (\p => removeChild p f.token) >>
     ignore (cancel f.canceled)
-  Bind P (AP P $ Poll f.outcome) (\_ => succeed ())
+  Bind P (poll $ tryGet f.outcome) (\_ => succeed ())
 
 export
 (.await) : Fiber es a -> Async es a
-(.await) f = AP P $ Poll f.outcome
+(.await) f = poll $ tryGet f.outcome
+
+export
+raceF : Async es (Fiber es a) -> Async es (Fiber es a) -> Async es a
+raceF x y = do
+  fx <- x
+  fy <- y
+  v  <- poll $ tryGet fx.outcome >>= \case
+          Nothing => tryGet fy.outcome
+          Just v  => pure (Just v)
+  fx.cancel
+  fy.cancel
+  pure v
+
+export
+race : Async es a -> Async es a -> Async es a
 
 --------------------------------------------------------------------------------
 -- Evaluation
@@ -250,7 +269,7 @@ parameters {auto tg : TokenGen}
       Succeeded Nothing  => pure ()
       Canceled           => ignore $ complete x Canceled
       Error err          => ignore $ complete x (Error err)
-    pure (Cede b . AP c $ Poll x)
+    pure (Cede b . AP c . Poll $ tryGet x)
 
   prim m b c (Start x) = do
     fbr <- newFiber (Just m)
@@ -258,7 +277,7 @@ parameters {auto tg : TokenGen}
     pure (Done b $ Succeeded fbr)
 
   prim m b c (Poll x)  = do
-    Nothing <- tryGet x | Just v => pure (Done b v)
+    Nothing <- x | Just v => pure (Done b v)
     pure (Cede b . AP c $ Poll x)
 
   prim m b c Cancel = pure (Done True Canceled)
