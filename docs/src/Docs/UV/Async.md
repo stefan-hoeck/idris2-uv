@@ -32,8 +32,11 @@ parameters {auto l : UVLoop}
     ref     <- newIORef 0
     pp      <- mkIdle
     counter <- onIdle (checkCounter ref)
-    _       <- onSignal SIGINT (\_ => putStrLn "canceling counter" >> counter.cancel)
-    pure ()
+
+    raceF (onSignal SIGINT $ pure ()) (once 5000 $ pure ())
+
+    putStrLn "Cancelling counter"
+    cancel
 
 main : IO ()
 main = runDoc idleExample
