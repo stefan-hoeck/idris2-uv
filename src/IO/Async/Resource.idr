@@ -7,7 +7,7 @@ import IO.Async.Async
 
 public export
 interface Resource a where
-  release : HasIO io => a -> io ()
+  release : a -> Async [] ()
 
 export
 use :
@@ -15,7 +15,7 @@ use :
   -> All (Async es) ts
   -> (HList ts -> Async es a)
   -> Async es a
-use []                  f = f []
+use           []        f = f []
 use @{_ :: _} (v :: vs) f = do
   rv <- v
   finally (use vs $ f . (rv::)) (release rv)

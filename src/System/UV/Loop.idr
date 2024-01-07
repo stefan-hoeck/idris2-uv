@@ -87,7 +87,7 @@ parameters {auto has : Has UVError es}
     -> Async es (Fiber es b)
   uvForever to p close reg =
     start $ finally
-      (forever $ \cb => do
+      (cancelable $ forever $ \cb => do
          n <- reg (\va => onAsync (to va) cb)
          case uvRes n of
            Left err => cb (Error err)
@@ -115,7 +115,7 @@ parameters {auto has : Has UVError es}
     -> Async es (Fiber es b)
   uvOnce to p close reg =
     start $ finally
-      (async $ \cb => do
+      (cancelable $ async $ \cb => do
          n <- reg (\va => onAsync (to va) cb)
          case uvRes n of
            Left err => cb (Error err)

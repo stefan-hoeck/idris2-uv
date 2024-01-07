@@ -12,31 +12,13 @@ record CancelState where
   constructor CS
   children     : SortedMap Token (MVar CancelState)
   canceled     : Bool
-  uncancelable : Nat
 
 export
-stopped : CancelState -> Bool
-stopped (CS _ True 0) = True
-stopped _             = False
-
-cancelVar : MVar CancelState -> (CancelState -> CancelState) -> IO CancelState
-cancelVar mv f = evalState mv $ \x => let x2 := f x in (x2,x2)
-
-export
-cancel : MVar CancelState -> IO CancelState
+cancel : MVar CancelState -> IO ()
 cancel v =
   evalIO v $ \cs =>
     let cs2 := {canceled := True, children := empty} cs
-        act := assert_total $ traverse_ cancel cs.children
-     in (cs2, act $> cs2)
-
-export %inline
-inc : MVar CancelState -> IO ()
-inc v = modifyMVar v {uncancelable $= S}
-
-export %inline
-dec : MVar CancelState -> IO ()
-dec v = modifyMVar v {uncancelable $= pred}
+     in (cs2, assert_total $ traverse_ cancel cs.children)
 
 export %inline
 removeChild : MVar CancelState -> Token -> IO ()

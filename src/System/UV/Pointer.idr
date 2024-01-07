@@ -1,6 +1,6 @@
 module System.UV.Pointer
 
-import IO.Async.Resource
+import IO.Async
 import Data.Buffer.Indexed
 import Data.ByteString
 import System.FFI

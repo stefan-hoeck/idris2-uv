@@ -31,11 +31,11 @@ hints (SI f t p) = do
 
 export
 Resource (Ptr AddrInfo) where
-  release = uv_freeaddrinfo
+  release = uncancelable . uv_freeaddrinfo
 
 export
 Resource (Ptr GetAddrInfo) where
-  release = freePtr
+  release = uncancelable . freePtr
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}

@@ -19,8 +19,15 @@ record Fiber (es : List Type) (a : Type) where
 export
 newFiber : TokenGen => (parent : Maybe (MVar CancelState)) -> IO (Fiber es a)
 newFiber parent = do
-  c <- newMVar (CS empty False 0)
+  c <- newMVar (CS empty False)
   t <- token
   for_ parent $ \p => addChild p t c
   o <- newDeferred
   pure $ MkFiber parent t c o
+
+export
+cancel : Bool -> Fiber es a -> IO ()
+cancel False _ = pure ()
+cancel True  f =
+  cancel f.canceled >>
+  for_ f.parent (`removeChild` f.token)
