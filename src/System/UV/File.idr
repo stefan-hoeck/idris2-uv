@@ -164,11 +164,12 @@ export %inline
 mkBuffer : HasIO io => Bits32 -> io (ReadBuffer)
 mkBuffer n = do
   buf <- mallocBuf n
+  putStrLn "allocating buffer of size \{show n}"
   pure (RB buf n)
 
 export
 Resource ReadBuffer where
-  release = freeBuf . ptr
+  release b = putStrLn "freeing buffer of size \{show $ b.size}" >> freeBuf b.ptr
 
 codeToMsg : Has UVError es => Int32 -> Outcome es (Maybe Bits32)
 codeToMsg 0 = Succeeded Nothing
@@ -213,7 +214,7 @@ parameters {auto l   : UVLoop}
   streamFileInto :
        (path : String)
     -> (buf  : ReadBuffer)
-    -> (ByteString -> Async es (Maybe b))
+    -> (ByteString -> Maybe b)
     -> Async es (Maybe b)
   streamFileInto {b} path buf fun =
     use [fsOpen path RDONLY 0] $ \[h] => cancelable $ go h
@@ -221,14 +222,16 @@ parameters {auto l   : UVLoop}
       go : File -> Async es (Maybe b)
       go h = do
         Just v  <- readBytesInto h buf | Nothing  => pure Nothing
-        Nothing <- fun v               | Just res => pure (Just res)
-        go h
+        putStrLn "reading bytes"
+        case fun v of
+          Nothing => go h
+          Just res => pure (Just res)
 
   export covering
   streamFileUntil :
        (path : String)
     -> Bits32
-    -> (ByteString -> Async es (Maybe b))
+    -> (ByteString -> Maybe b)
     -> Async es (Maybe b)
   streamFileUntil {b} path n fun =
     use [mkBuffer n] $ \[b] => streamFileInto path b fun
@@ -237,7 +240,6 @@ parameters {auto l   : UVLoop}
   streamFile :
        (path : String)
     -> Bits32
-    -> (ByteString -> Async es ())
     -> Async es (Maybe ())
-  streamFile path n fun =
-    streamFileUntil path n (\x => fun x $> Nothing)
+  streamFile path n =
+    streamFileUntil path n (\x => Nothing)

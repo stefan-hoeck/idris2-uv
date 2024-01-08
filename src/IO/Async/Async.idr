@@ -81,11 +81,7 @@ data Async : List Type -> Type -> Type where
   -- Note: Even if the cancelability is set to "cancelable" (`C`),
   -- one of the child computations might still be uncancelable
   -- and must be run to completion.
-  Bind :
-       Cancelability
-    -> Async es a
-    -> (Outcome es a -> Async fs b)
-    -> Async fs b
+  AB : Cancelability -> Async es a -> (Outcome es a -> Async fs b) -> Async fs b
 
 ||| Print some debugging information about the inner
 ||| structure and cancelability of an `Async` computation.
@@ -99,12 +95,12 @@ primType (Start x) = "Start of \{type x}"
 primType (Poll x)  = "Poll"
 primType Cancel    = "Cancel"
 
-type (AP c x)     = "AP(\{disp c}) of \{primType x}"
-type (Bind c x f) = "Bind(\{disp c}) of \{type x}"
+type (AP c x)   = "AP(\{disp c}) of \{primType x}"
+type (AB c x f) = "AB(\{disp c}) of \{type x}"
 
 depth : Async es a -> Nat
-depth (AP _ _)     = 0
-depth (Bind _ x _) = S $ depth x
+depth (AP _ _)   = 0
+depth (AB _ x _) = S $ depth x
 
 --------------------------------------------------------------------------------
 -- Synchronous utilities
@@ -152,14 +148,14 @@ throw = fail . inject
 ||| Sets the given computation's cancelability to "cancelable".
 export
 cancelable : Async es a -> Async es a
-cancelable (AP _ x)     = AP C x
-cancelable (Bind _ x f) = Bind C x f
+cancelable (AP _ x)   = AP C x
+cancelable (AB _ x f) = AB C x f
 
 ||| Sets the given computation's cancelability to "uncancelable".
 export
 uncancelable : Async es a -> Async es a
-uncancelable (AP _ x)     = AP U x
-uncancelable (Bind _ x f) = Bind U x f
+uncancelable (AP _ x)   = AP U x
+uncancelable (AB _ x f) = AB U x f
 
 ||| Cancels the current fiber, stopping all asynchronous computations
 ||| as soon as possible by respecting their cancelability.
@@ -174,25 +170,25 @@ cancel = AP P Cancel
 -- implementation of (>>=)
 bind : Async es a -> (a -> Async es b) -> Async es b
 bind aa f =
-  Bind P aa $ \case
+  AB P aa $ \case
     Succeeded v => f v
     Error err   => fail err
     Canceled    => canceled
 
-export %inline
+export
 Functor (Async es) where
   map f aa = bind aa (succeed . f)
 
-export %inline
+export
 Applicative (Async es) where
   pure      = succeed
   af <*> aa = bind af (<$> aa)
 
-export %inline
+export
 Monad (Async es) where
   (>>=) = bind
 
-export %inline
+export
 HasIO (Async es) where
   liftIO = sync . map Succeeded
 
@@ -203,7 +199,7 @@ HasIO (Async es) where
 export
 catch : (HSum es -> Async fs a) -> Async es a -> Async fs a
 catch f as =
-  Bind U as $ \case
+  AB U as $ \case
     Succeeded a => pure a
     Error err   => f err
     Canceled    => canceled
@@ -234,7 +230,7 @@ guarantee :
   -> (cleanup : Outcome es a -> Async [] ())
   -> Async es a
 guarantee as fun =
-  Bind U as (\o => Bind U (fun o) (\_ => sync $ pure o))
+  AB U as (\o => AB U (fun o) (\_ => sync $ pure o))
 
 ||| Guarantees to run the given cleanup hook in case a fiber
 ||| has been canceled.
@@ -335,7 +331,7 @@ export
   liftIO $
     for_ f.parent (\p => removeChild p f.token) >>
     ignore (cancel f.canceled)
-  Bind P (poll $ tryGet f.outcome) (\_ => succeed ())
+  AB P (poll $ tryGet f.outcome) (\_ => succeed ())
 
 ||| Semantically blocks the current fiber until the target fiber
 ||| has produced a result, in which case we continue with that
@@ -378,6 +374,27 @@ raceEither x y = race (map Left x) (map Right y)
 -- Evaluation
 --------------------------------------------------------------------------------
 
+data View : List Type -> Type -> Type where
+  VP : Cancelability -> Prim es a -> View es a
+  VB :
+       Cancelability
+    -> Prim es a
+    -> Cancelability
+    -> (Outcome es a -> Async fs b)
+    -> View fs b
+
+fromView : View es a -> Async es a
+fromView (VP x y)     = AP x y
+fromView (VB x y z f) = AB z (AP x y) f
+
+covering
+toView : Async es a -> View es a
+toView (AP c  y)   = VP c y
+toView (AB cp y f) =
+  case y of
+    AP cc p   => VB (cp <+> cc) p cp f
+    AB cc z g => toView $ AB (cp <+> cc) z (\x => AB cp (g x) f)
+
 ||| Intermediary state of a running asynchronous computation
 ||| concisting of the fiber it is running on and the current
 ||| state of evaluation.
@@ -410,7 +427,6 @@ contextToTokenGen @{c} = c.tokenGen
 -- boolean values indicate whether the current fiber has
 -- been canceled before or during the evaluation.
 data EvalRes : (es : List Type) -> Type -> Type where
-  Cont : Bool -> Async es a -> EvalRes es a
   Cede : Bool -> Async es a -> EvalRes es a
   Done : Bool -> Outcome es a -> EvalRes es a
 
@@ -422,13 +438,12 @@ doneType Canceled = "Canceled"
 
 -- debug string for outcomes
 resDebugMsg : EvalRes es a -> String
-resDebugMsg (Cont b x) = "Cont of type \{type x} and depth \{show $ depth x}"
 resDebugMsg (Cede b x) = "Cede of type \{type x} and depth \{show $ depth x}"
 resDebugMsg (Done b x) = "Done of type \{doneType x}"
 
 set : Cancelability -> Async es a -> Async es a
-set x (AP y z)     = AP (x <+> y) z
-set x (Bind y z f) = Bind (x <+> y) z f
+set x (AP y z)   = AP (x <+> y) z
+set x (AB y z f) = AB (x <+> y) z f
 
 parameters {auto ctxt : AsyncContext}
 
@@ -464,24 +479,24 @@ parameters {auto ctxt : AsyncContext}
   step :
        MVar CancelState
     -> Bool
-    -> Async es a
-    -> IO (EvalRes es a)
-  step m True (AP C _)     = pure (Done True Canceled)
-  step m b    (AP c p)     = prim m b c p
-  step m b    (Bind c x f) =
-    step m b (set c x) >>= \case
-      Cont b2 z => step m b2 (Bind c z f)
-      Cede b2 z => pure (Cede b2 $ Bind c z f)
-      Done b2 z => step m b2 (set c $ f z)
+    -> View es a
+    -> PrimIO (EvalRes es a)
+  step m True  (VP C _)     w = MkIORes (Done True Canceled) w
+  step m True  (VB C _ x f) w = step m True (toView . set x $ f Canceled) w
+  step m b     (VP c p)     w = toPrim (prim m b c p) w
+  step m b     (VB c p x f) w =
+    let MkIORes o w2 := toPrim (prim m b c p) w
+     in case o of
+          Done b2 z => step m b2 (toView . set x $ f z) w2
+          Cede b2 z => MkIORes (Cede b2 $ AB x z f) w2
 
   export covering
   eval : EvalST -> IO ()
   eval (EST f act) = do
     cs  <- readMVar f.canceled
-    res <- step f.canceled cs.canceled (set C act)
+    res <- primIO (step f.canceled cs.canceled (toView $ set C act))
     -- putStrLn (resDebugMsg res)
     case res of
-      Cont b act' => cancel b f >> ctxt.submit (EST f act')
       Cede b act' => cancel b f >> ctxt.submit (EST f act')
       Done b res  => cancel b f >> ignore (complete f.outcome res)
 

@@ -5,6 +5,7 @@ module Docs.UV.Async
 
 import Data.IORef
 import System
+import System.File
 import System.UV
 import System.UV.Idle
 import System.UV.Signal
@@ -43,21 +44,36 @@ parameters {auto l : UVLoop}
     putOutLn "Cancelling counter"
     cancel
 
+  readTest : String -> Nat -> DocIO ByteString
+  readTest p n =
+    uvAsync $ \cb => do
+      Right bs <- withFile p Read pure $ readByteString n
+        | Left err => cb (Succeeded empty) $> 0
+      cb (Succeeded bs)
+      pure 0
+
   readExample : DocIO ()
   readExample = do
     (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
-    readFile p 0xffff >>= bytesOut
+    readTest p 0xfffff >>= bytesOut
+
+  test : Nat -> DocIO ()
+  test 0  = pure ()
+  test (S k) = do
+    readExample
+    test k
 
   fileStreamExample : DocIO ()
   fileStreamExample = do
-    (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
-    v <- raceEither (onSignal SIGINT) (streamFile p 0xfffff bytesOut)
-    case v of
-      Left s  => putOutLn "\nStream interrupted by \{show s}"
-      Right _ => putOutLn "\nStream exhausted."
+    (_::t) <- getArgs | _ => putErrLn "Invalid number of arguments"
+    for_ t $ \f => ignore $ streamFile f 0xfffff
+    -- v <- raceEither (onSignal SIGINT) (streamFile p 0xfffff $ \b => pure ())
+    -- case v of
+    --   Left s  => putOutLn "\nStream interrupted by \{show s}"
+    --   Right _ => putOutLn "\nStream exhausted."
 
 main : IO ()
-main = runDoc fileStreamExample
+main = runDoc $ test 10000
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown
