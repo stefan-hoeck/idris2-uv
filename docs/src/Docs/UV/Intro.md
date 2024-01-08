@@ -314,7 +314,7 @@ That's still more cleaning up of resources. In the end, we print the
 data we read to *stdout* (file handle 1) at offset `-1` (the current
 offset) and free the allocated buffer.
 
-In order to to simplify things, we closed the file.
+In order to simplify things, we closed the file synchronically.
 This will block the event loop but for simple one-off operations
 like this, that's usually alright.
 Otherwise, we'd have to allocate and free even more stuff.

@@ -209,6 +209,10 @@ catch f as =
     Canceled    => canceled
 
 export
+dropErrs : Async es () -> Async [] ()
+dropErrs = catch (const $ pure ())
+
+export
 handle : All (\x => x -> Async [] a) es -> Async es a -> Async [] a
 handle hs = catch (collapse' . hzipWith id hs)
 
@@ -353,12 +357,12 @@ raceF : (x,y : Async es (Fiber es a)) -> Async es a
 raceF x y = do
   fx <- x
   fy <- y
-  v  <- poll $ tryGet fx.outcome >>= \case
-          Nothing => tryGet fy.outcome
-          Just v  => pure (Just v)
-  fx.cancel
-  fy.cancel
-  pure v
+  finally
+    (cancelable $ poll $
+       tryGet fx.outcome >>= \case
+         Nothing => tryGet fy.outcome
+         Just v  => pure (Just v)
+    ) (dropErrs $ fx.cancel >> fy.cancel)
 
 ||| Alias for `raceF (start x) (start y)`.
 export %inline

@@ -1,12 +1,13 @@
 module System.UV.File
 
 import Data.Buffer
-import Data.Buffer.Indexed
-import Data.ByteString
 import Data.Maybe
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Util
+
+import public Data.Buffer.Indexed
+import public Data.ByteString
 
 import public System.UV.Raw.File
 
@@ -120,6 +121,39 @@ parameters {auto l   : UVLoop}
   readFile : (path : String) -> Bits32 -> Async es ByteString
   readFile path n =
     use [fsOpen path RDONLY 0] $ \[f] => readBytes f n
+
+  export covering
+  streamFileInto :
+       (path : String)
+    -> (buf  : ReadBuffer)
+    -> (ByteString -> Async es (Maybe b))
+    -> Async es (Maybe b)
+  streamFileInto {b} path buf fun =
+    use [fsOpen path RDONLY 0] $ \[h] => cancelable $ go h
+    where
+      go : File -> Async es (Maybe b)
+      go h = do
+        Just v  <- readBytesInto h buf | Nothing  => pure Nothing
+        Nothing <- fun v               | Just res => pure (Just res)
+        go h
+
+  export covering
+  streamFileUntil :
+       (path : String)
+    -> Bits32
+    -> (ByteString -> Async es (Maybe b))
+    -> Async es (Maybe b)
+  streamFileUntil {b} path n fun =
+    use [mkBuffer n] $ \[b] => streamFileInto path b fun
+
+  export covering
+  streamFile :
+       (path : String)
+    -> Bits32
+    -> (ByteString -> Async es ())
+    -> Async es (Maybe ())
+  streamFile path n fun =
+    streamFileUntil path n (\x => fun x $> Nothing)
 
 --------------------------------------------------------------------------------
 -- File Writing
