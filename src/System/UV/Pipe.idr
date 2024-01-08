@@ -38,4 +38,4 @@ parameters {auto l : UVLoop}
   streamStdin :
        (ReadRes ByteString -> Async es (Maybe a))
     -> Async es (Fiber es a)
-  streamStdin run = use [stdinOpen] $ \[h] => streamRead 0xffff h run
+  streamStdin run = use1 stdinOpen $ \h => streamRead 0xffff h run

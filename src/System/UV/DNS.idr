@@ -54,5 +54,5 @@ parameters {auto l   : UVLoop}
   export
   addrInfo : (node, service : String) -> SockInfo -> Async es (Ptr AddrInfo)
   addrInfo n s h =
-    use [hints h, mallocPtr GetAddrInfo] $ \[hs,pg] => do
+    useMany [hints h, mallocPtr GetAddrInfo] $ \[hs,pg] => do
       uvAsync $ \cb => uv_getaddrinfo l.loop pg (gaCB cb) n s hs

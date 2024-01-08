@@ -52,28 +52,29 @@ parameters {auto l : UVLoop}
       cb (Succeeded bs)
       pure 0
 
-  readExample : DocIO ()
-  readExample = do
-    (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
-    readTest p 0xfffff >>= bytesOut
+  readExample : String -> DocIO ()
+  readExample p = do
+    readFile p 0xfffff >>= \_ => pure ()
 
-  test : Nat -> DocIO ()
-  test 0  = pure ()
-  test (S k) = do
-    readExample
-    test k
+  test : String -> Nat -> DocIO ()
+  test p 0  = pure ()
+  test p (S k) = do
+    readExample p
+    test p k
 
   fileStreamExample : DocIO ()
   fileStreamExample = do
-    (_::t) <- getArgs | _ => putErrLn "Invalid number of arguments"
-    for_ t $ \f => ignore $ streamFile f 0xfffff
-    -- v <- raceEither (onSignal SIGINT) (streamFile p 0xfffff $ \b => pure ())
-    -- case v of
-    --   Left s  => putOutLn "\nStream interrupted by \{show s}"
-    --   Right _ => putOutLn "\nStream exhausted."
+    (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
+    -- for_ t $ \f => ignore $ streamFile f 0xfffff
+    v <- raceEither (onSignal SIGINT) (streamFile p 0xfffff bytesOut)
+    case v of
+      Left s  => putOutLn "\nStream interrupted by \{show s}"
+      Right _ => putOutLn "\nStream exhausted."
 
 main : IO ()
-main = runDoc $ test 10000
+main = do
+  (_::p::_) <- getArgs | _ => putStrLn "Invalid number of arguments"
+  runDoc $ test p 40000
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown

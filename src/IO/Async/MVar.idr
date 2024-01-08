@@ -100,8 +100,15 @@ get : Deferred a -> IO a
 get = get' True
 
 export %inline
+clearGet : Deferred a -> IO (Maybe a)
+clearGet d = do
+  Just v <- readMVar d.var | Nothing => pure Nothing
+  writeMVar d.var Nothing
+  pure $ Just v
+
+export %inline
 tryGet : Deferred a -> IO (Maybe a)
-tryGet d = readMVar d.var
+tryGet = readMVar . var
 
 export
 complete : Deferred a -> a -> IO Bool

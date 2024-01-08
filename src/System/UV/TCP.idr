@@ -70,7 +70,7 @@ parameters {auto l : UVLoop}
     -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
     -> Async es (Fiber es a)
   listenTcp address port run =
-    use [mallocPtr SockAddrIn] $ \[addr] => do
+    use1 (mallocPtr SockAddrIn) $ \addr => do
       uv (uv_ip4_addr address port addr)
       server <- bindTcp addr
       listen server run

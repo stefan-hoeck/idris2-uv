@@ -60,7 +60,7 @@ parameters {auto l   : UVLoop}
   export
   fsOpen : String -> Flags -> Mode -> Async es File
   fsOpen path f m = do
-    use [mallocPtr Fs] $ \[fs] =>
+    use1 (mallocPtr Fs) $ \fs =>
       uvAsync $ uv_fs_open l.loop fs path f.flags m.mode . fileOutcome
 
 --------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ parameters {auto l   : UVLoop}
   export
   writeBytesAt : File -> (offset : Int64) -> ByteString -> Async es ()
   writeBytesAt h offset bs =
-    use [mallocPtr Fs, fromByteString bs] $ \[fs,buf] =>
+    useMany [mallocPtr Fs, fromByteString bs] $ \[fs,buf] =>
       uvAsync $ \cb =>
         uv_fs_write l.loop fs h.file buf 1 offset $ \_ => cb (Succeeded ())
 
@@ -84,7 +84,7 @@ parameters {auto l   : UVLoop}
   export %inline
   writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
   writeFile p fs m bs =
-    use [fsOpen p (WRONLY <+> fs) m] $ \[h] => writeBytes h bs
+    use1 (fsOpen p (WRONLY <+> fs) m) $ \h => writeBytes h bs
 
   export %inline
   toFile : (path : String) -> ByteString -> Async es ()
@@ -164,12 +164,11 @@ export %inline
 mkBuffer : HasIO io => Bits32 -> io (ReadBuffer)
 mkBuffer n = do
   buf <- mallocBuf n
-  putStrLn "allocating buffer of size \{show n}"
   pure (RB buf n)
 
 export
 Resource ReadBuffer where
-  release b = putStrLn "freeing buffer of size \{show $ b.size}" >> freeBuf b.ptr
+  release b = freeBuf b.ptr
 
 codeToMsg : Has UVError es => Int32 -> Outcome es (Maybe Bits32)
 codeToMsg 0 = Succeeded Nothing
@@ -179,10 +178,9 @@ parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
 
   readRes :
-       {auto hio : HasIO io}
-    -> Ptr Buf
+       Ptr Buf
     -> Ptr Fs
-    -> io (Outcome es (Maybe ByteString))
+    -> IO (Outcome es (Maybe ByteString))
   readRes buf fs = do
     c <- uv_fs_get_result fs
     traverse (traverse (toByteString buf)) (codeToMsg c)
@@ -190,7 +188,7 @@ parameters {auto l   : UVLoop}
   export
   readBytesInto : File -> (buf : ReadBuffer) -> Async es (Maybe ByteString)
   readBytesInto f (RB buf n) =
-    use [mallocPtr Fs] $ \[fs] => do
+    use1 (mallocPtr Fs) $ \fs => do
       setBufLen buf n
       uvAsync $ \cb =>
         uv_fs_read l.loop fs f.file buf 1 (-1) $ \p => readRes buf p >>= cb
@@ -198,7 +196,7 @@ parameters {auto l   : UVLoop}
   export
   readBytes : File -> Bits32 -> Async es ByteString
   readBytes f n =
-    use [mkBuffer n] $ \[buf] =>
+    use1 (mkBuffer n) $ \buf =>
       fromMaybe empty <$> readBytesInto f buf
 
   export
@@ -208,38 +206,37 @@ parameters {auto l   : UVLoop}
   export covering
   readFile : (path : String) -> Bits32 -> Async es ByteString
   readFile path n =
-    use [fsOpen path RDONLY 0] $ \[f] => readBytes f n
+    use1 (fsOpen path RDONLY 0) $ \f => readBytes f n
 
   export covering
   streamFileInto :
        (path : String)
     -> (buf  : ReadBuffer)
-    -> (ByteString -> Maybe b)
+    -> (ByteString -> Async es (Maybe b))
     -> Async es (Maybe b)
   streamFileInto {b} path buf fun =
-    use [fsOpen path RDONLY 0] $ \[h] => cancelable $ go h
+    use1 (fsOpen path RDONLY 0) $ \h => cancelable $ go h
     where
       go : File -> Async es (Maybe b)
       go h = do
         Just v  <- readBytesInto h buf | Nothing  => pure Nothing
-        putStrLn "reading bytes"
-        case fun v of
-          Nothing => go h
-          Just res => pure (Just res)
+        Nothing <- fun v               | Just res => pure (Just res)
+        go h
 
   export covering
   streamFileUntil :
        (path : String)
     -> Bits32
-    -> (ByteString -> Maybe b)
+    -> (ByteString -> Async es (Maybe b))
     -> Async es (Maybe b)
   streamFileUntil {b} path n fun =
-    use [mkBuffer n] $ \[b] => streamFileInto path b fun
+    use1 (mkBuffer n) $ \b => streamFileInto path b fun
 
   export covering
   streamFile :
        (path : String)
     -> Bits32
+    -> (ByteString -> Async es ())
     -> Async es (Maybe ())
-  streamFile path n =
-    streamFileUntil path n (\x => Nothing)
+  streamFile path n fun =
+    streamFileUntil path n (\x => fun x $> Nothing)

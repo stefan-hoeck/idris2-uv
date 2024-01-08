@@ -462,7 +462,7 @@ parameters {auto ctxt : AsyncContext}
       Succeeded Nothing  => pure ()
       Canceled           => ignore $ complete x Canceled
       Error err          => ignore $ complete x (Error err)
-    pure (Cede b . AP c . Poll $ tryGet x)
+    pure (Cede b . AP c . Poll $ clearGet x)
 
   prim m b c (Start x) = do
     fbr <- newFiber (Just m)
