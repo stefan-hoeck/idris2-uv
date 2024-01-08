@@ -21,13 +21,13 @@ parameters {auto l   : UVLoop}
   mkSignal = mallocPtr Signal >>= uvAct (uv_signal_init l.loop)
 
   ||| Reacts on process signals.
+  |||
+  ||| Note: If used in a do-block this will semantically block the
+  |||       current fiber.
+  |||       Wrap this in `start` to run it in the background.
   export covering
-  onSignal' : SigCode -> (SigCode -> Async es a) -> Async es (Fiber es a)
-  onSignal' c run = do
+  onSignal : SigCode -> Async es SigCode
+  onSignal c = do
     ps <- mkSignal
-    uvOnce run ps signal_stop $ \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)
-
-  ||| Reacts on process signals.
-  export %inline covering
-  onSignal : SigCode -> Async es a -> Async es (Fiber es a)
-  onSignal c = onSignal' c . const
+    uvOnce ps signal_stop $
+      \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)

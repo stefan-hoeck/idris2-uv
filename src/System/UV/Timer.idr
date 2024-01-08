@@ -38,7 +38,7 @@ parameters {auto l   : UVLoop}
 
   ||| Sends a signal after `timeout` milliseconds have passed.
   export covering
-  once : (timeout : Bits64) -> Async es a -> Async es (Fiber es a)
-  once t run = do
+  once : (timeout : Bits64) -> Async es ()
+  once t = do
     pt <- mkTimer
-    uvOnce' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t 0
+    uvOnce' pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t 0
