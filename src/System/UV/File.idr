@@ -64,6 +64,93 @@ parameters {auto l   : UVLoop}
       uvAsync $ uv_fs_open l.loop fs path f.flags m.mode . fileOutcome
 
 --------------------------------------------------------------------------------
+-- File Writing
+--------------------------------------------------------------------------------
+
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+
+  export
+  writeBytesAt : File -> (offset : Int64) -> ByteString -> Async es ()
+  writeBytesAt h offset bs =
+    use [mallocPtr Fs, fromByteString bs] $ \[fs,buf] =>
+      uvAsync $ \cb =>
+        uv_fs_write l.loop fs h.file buf 1 offset $ \_ => cb (Succeeded ())
+
+  export %inline
+  writeBytes : File -> ByteString -> Async es ()
+  writeBytes h = writeBytesAt h (-1)
+
+  export %inline
+  writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
+  writeFile p fs m bs =
+    use [fsOpen p (WRONLY <+> fs) m] $ \[h] => writeBytes h bs
+
+  export %inline
+  toFile : (path : String) -> ByteString -> Async es ()
+  toFile p = writeFile p CREAT 0o644
+
+  export %inline
+  appendToFile : (path : String) -> ByteString -> Async es ()
+  appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
+
+  ||| Writes all bytes to `stdout`.
+  export %inline
+  bytesOut : ByteString -> Async es ()
+  bytesOut = writeBytes stdout
+
+  ||| Write some text to `stdout`.
+  export %inline
+  putOut : String -> Async es ()
+  putOut = bytesOut . fromString
+
+  ||| Sink that writes all text to `stdout`, interpreting
+  ||| every item as a single line
+  export %inline
+  putOutLn : String -> Async es ()
+  putOutLn = putOut . (++ "\n")
+
+  ||| Sink that printes values to `stdout` using their `Show`
+  ||| implementation.
+  export %inline
+  printOut : Show a => a -> Async es ()
+  printOut = putOut . show
+
+  ||| Sink that printes values to `stdout` using their `Show`
+  ||| implementation and putting every item on a single line.
+  export %inline
+  printOutLn : Show a => a -> Async es ()
+  printOutLn = putOutLn . show
+
+  ||| Writes all bytes to `stderr`.
+  export %inline
+  bytesErr : ByteString -> Async es ()
+  bytesErr = writeBytes stderr
+
+  ||| Write some text to `stderr`.
+  export %inline
+  putErr : String -> Async es ()
+  putErr = bytesErr . fromString
+
+  ||| Sink that writes all text to `stderr`, interpreting
+  ||| every item as a single line
+  export %inline
+  putErrLn : String -> Async es ()
+  putErrLn = putErr . (++ "\n")
+
+  ||| Sink that printes values to `stderr` using their `Show`
+  ||| implementation.
+  export %inline
+  printErr : Show a => a -> Async es ()
+  printErr = putErr . show
+
+  ||| Sink that printes values to `stderr` using their `Show`
+  ||| implementation and putting every item on a single line.
+  export %inline
+  printErrLn : Show a => a -> Async es ()
+  printErrLn = putErrLn . show
+
+--------------------------------------------------------------------------------
 -- File Reading
 --------------------------------------------------------------------------------
 
@@ -154,87 +241,3 @@ parameters {auto l   : UVLoop}
     -> Async es (Maybe ())
   streamFile path n fun =
     streamFileUntil path n (\x => fun x $> Nothing)
-
---------------------------------------------------------------------------------
--- File Writing
---------------------------------------------------------------------------------
-
-  export
-  writeBytesAt : File -> (offset : Int64) -> ByteString -> Async es ()
-  writeBytesAt h offset bs =
-    use [mallocPtr Fs, fromByteString bs] $ \[fs,buf] =>
-      uvAsync $ \cb =>
-        uv_fs_write l.loop fs h.file buf 1 offset $ \_ => cb (Succeeded ())
-
-  export %inline
-  writeBytes : File -> ByteString -> Async es ()
-  writeBytes h = writeBytesAt h (-1)
-
-  export %inline
-  writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
-  writeFile p fs m bs =
-    use [fsOpen p (WRONLY <+> fs) m] $ \[h] => writeBytes h bs
-
-  export %inline
-  toFile : (path : String) -> ByteString -> Async es ()
-  toFile p = writeFile p CREAT 0o644
-
-  export %inline
-  appendToFile : (path : String) -> ByteString -> Async es ()
-  appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
-
-  ||| Writes all bytes to `stdout`.
-  export %inline
-  bytesOut : ByteString -> Async es ()
-  bytesOut = writeBytes stdout
-
-  ||| Write some text to `stdout`.
-  export %inline
-  putOut : String -> Async es ()
-  putOut = bytesOut . fromString
-
-  ||| Sink that writes all text to `stdout`, interpreting
-  ||| every item as a single line
-  export %inline
-  putOutLn : String -> Async es ()
-  putOutLn = putOut . (++ "\n")
-
-  ||| Sink that printes values to `stdout` using their `Show`
-  ||| implementation.
-  export %inline
-  printOut : Show a => a -> Async es ()
-  printOut = putOut . show
-
-  ||| Sink that printes values to `stdout` using their `Show`
-  ||| implementation and putting every item on a single line.
-  export %inline
-  printOutLn : Show a => a -> Async es ()
-  printOutLn = putOutLn . show
-
-  ||| Writes all bytes to `stderr`.
-  export %inline
-  bytesErr : ByteString -> Async es ()
-  bytesErr = writeBytes stderr
-
-  ||| Write some text to `stderr`.
-  export %inline
-  putErr : String -> Async es ()
-  putErr = bytesErr . fromString
-
-  ||| Sink that writes all text to `stderr`, interpreting
-  ||| every item as a single line
-  export %inline
-  putErrLn : String -> Async es ()
-  putErrLn = putErr . (++ "\n")
-
-  ||| Sink that printes values to `stderr` using their `Show`
-  ||| implementation.
-  export %inline
-  printErr : Show a => a -> Async es ()
-  printErr = putErr . show
-
-  ||| Sink that printes values to `stderr` using their `Show`
-  ||| implementation and putting every item on a single line.
-  export %inline
-  printErrLn : Show a => a -> Async es ()
-  printErrLn = putErrLn . show
