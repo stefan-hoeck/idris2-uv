@@ -37,6 +37,12 @@ int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
   return res;
 }
 
+int uv_fs_write_async(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+                     unsigned int size, int64_t offset, uv_fs_cb cb){
+  uv_buf_t buf = uv_buf_init(data, size);
+  return uv_fs_write(loop, req, file, &buf, 1, offset, cb);
+}
+
 void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len) {
   *buf = uv_buf_init(base, len);
   return buf;

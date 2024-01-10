@@ -27,6 +27,9 @@ int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags,
 int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
                      unsigned int nbufs, int64_t offset);
 
+int uv_fs_write_async(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+                     unsigned int size, int64_t offset, uv_fs_cb cb);
+
 int uv_EOF();
 
 // `addrinfo` setters and getters

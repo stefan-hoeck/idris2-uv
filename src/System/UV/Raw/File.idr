@@ -1,5 +1,6 @@
 module System.UV.Raw.File
 
+import Data.Buffer
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
@@ -8,6 +9,12 @@ import System.UV.Raw.Util
 import public System.UV.Data.File
 
 %default total
+
+export
+data FsCallable : Type where [external]
+
+export
+data FsCB : Type where [external]
 
 export
 data UV_Timespec_T : Type where [external]
@@ -28,6 +35,17 @@ data Dirent : Type where
 -- FFI
 --------------------------------------------------------------------------------
 
+export %foreign "scheme:(lambda (x) (foreign-callable #f (lambda (cb0) ((x cb0) #f)) (void*) void))"
+fsCallable : (Ptr Fs -> PrimIO ()) -> Ptr FsCallable
+
+export %foreign "scheme:foreign-callable-entry-point"
+fsCB : Ptr FsCallable -> Ptr FsCB
+
+export %foreign "scheme:lock-object"
+lockFsCallable : Ptr FsCallable -> PrimIO ()
+
+export %foreign "scheme:unlock-object"
+unlockFsCallable : Ptr FsCallable -> PrimIO ()
 
 export %foreign (idris_uv "uv_get_st_dev")
 st_dev : Ptr Stat -> Bits64
@@ -268,15 +286,15 @@ prim__uv_fs_read :
   -> (cb     : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
-%foreign (idris_uv "uv_fs_write")
-prim__uv_fs_write :
+%foreign (idris_uv "uv_fs_write_async")
+prim__uv_fs_write_async :
      Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
-  -> (bufs   : Ptr Buf)
-  -> (nbufs  : Bits32)
+  -> (buf    : Buffer)
+  -> (size   : Bits32)
   -> (offset : Int64)
-  -> (cb     : Ptr Fs -> PrimIO ())
+  -> (cb     : Ptr FsCB)
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_write_sync")
@@ -707,18 +725,17 @@ parameters {auto has : HasIO io}
   ||| Writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
   export %inline
-  uv_fs_write :
+  uv_fs_write_async :
        Ptr Loop
     -> Ptr Fs
     -> (file   : Int32)
-    -> (bufs   : Ptr Buf)
-    -> (nbufs  : Bits32)
+    -> (buf    : Buffer)
+    -> (size   : Bits32)
     -> (offset : Int64)
-    -> (cb     : Ptr Fs -> IO ())
+    -> (cb     : Ptr FsCB)
     -> io Int32
-  uv_fs_write l f h bufs nbufs offset act =
-    primIO $ prim__uv_fs_write l f h bufs nbufs offset $
-      \fp => toPrim (act fp)
+  uv_fs_write_async l f h buf size offset act =
+    primIO $ prim__uv_fs_write_async l f h buf size offset act
 
   ||| Synchronously writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
