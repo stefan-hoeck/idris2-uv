@@ -4,42 +4,56 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
-
-uv_buf_t uv_deref_buf(uv_buf_t *ptr) { return *ptr; }
-
-void *uv_set_buf_len(uv_buf_t *buf, unsigned int length) { buf->len = length; }
+#include "idris2-cb.h"
 
 unsigned int uv_get_buf_len(uv_buf_t *buf) { return buf->len; }
 
 char *uv_get_buf_base(uv_buf_t *buf) { return buf->base; }
 
-void *uv_set_buf_base(uv_buf_t *buf, char *dat) { buf->base = dat; }
-
-void *uv_copy_buf(char *src, char *dest, int len) { memcpy(dest, src, len); }
-
 int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
   uv_fs_t req;
-  return uv_fs_close(loop, &req, file, NULL);
-}
-
-int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags,
-                    int mode) {
-  return uv_fs_open(loop, req, path, flags, mode, NULL);
-}
-
-void *uv_close_sync(uv_handle_t *handle) { uv_close(handle, NULL); }
-
-int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
-                     unsigned int nbufs, int64_t offset) {
-  uv_fs_t req;
-  int res = uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);
+  int res = uv_fs_close(loop, &req, file, NULL);
   uv_fs_req_cleanup(&req);
   return res;
 }
 
-void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len) {
-  *buf = uv_buf_init(base, len);
-  return buf;
+int uv_fs_open_sync(uv_loop_t *loop, const char *path, int flags,
+                    int mode) {
+  uv_fs_t req;
+  int res = uv_fs_open(loop, &req, path, flags, mode, NULL);
+  uv_fs_req_cleanup(&req);
+  return res;
+}
+
+void *uv_close_sync(uv_handle_t *handle) { uv_close(handle, NULL); }
+
+int uv_fs_write_cb(uv_loop_t *loop, uv_file file, char *data,
+                     unsigned int size, int64_t offset, int *tag) {
+  uv_buf_t buf = uv_buf_init(data, size);
+  uv_fs_t *req = malloc(sizeof(uv_fs_t));
+  req->data = tag;
+  int res = uv_fs_write(loop, req, file, &buf, 1, offset, idris_write_cb);
+  if (res < 0) {free(req);}
+  return res;
+}
+
+int uv_fs_read_cb(uv_loop_t *loop, uv_file file, char *data,
+                 unsigned int size, int64_t offset, int *tag){
+  uv_buf_t buf = uv_buf_init(data, size);
+  uv_fs_t *req = malloc(sizeof(uv_fs_t));
+  req->data = tag;
+  int res = uv_fs_read(loop, req, file, &buf, 1, offset, idris_read_cb);
+  if (res < 0) {free(req);}
+  return res;
+}
+
+int uv_fs_write_sync(uv_loop_t *loop, uv_file file, char *data,
+                     unsigned int size, int64_t offset) {
+  uv_buf_t buf = uv_buf_init(data, size);
+  uv_fs_t req;
+  int res = uv_fs_write(loop, &req, file, &buf, 1, offset, NULL);
+  uv_fs_req_cleanup(&req);
+  return res;
 }
 
 // `addrinfo` setters and getters

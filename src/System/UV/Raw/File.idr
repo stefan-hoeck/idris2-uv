@@ -1,5 +1,6 @@
 module System.UV.Raw.File
 
+import Data.Buffer
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
@@ -124,6 +125,9 @@ prim__uv_fs_get_dirent_type : Ptr Dirent -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_req_cleanup")
 prim__uv_fs_req_cleanup : Ptr Fs -> PrimIO ()
+
+%foreign (idris_uv "uv_fs_cleanup")
+prim__uv_fs_cleanup : Ptr Fs -> PrimIO ()
 
 %foreign (idris_uv "uv_fs_unlink")
 prim__uv_fs_unlink :
@@ -268,23 +272,22 @@ prim__uv_fs_read :
   -> (cb     : Ptr Fs -> PrimIO ())
   -> PrimIO Int32
 
-%foreign (idris_uv "uv_fs_write")
-prim__uv_fs_write :
+%foreign (idris_uv "uv_fs_write_cb")
+prim__uv_fs_write_cb :
      Ptr Loop
-  -> Ptr Fs
   -> (file   : Int32)
-  -> (bufs   : Ptr Buf)
-  -> (nbufs  : Bits32)
+  -> (buf    : Buffer)
+  -> (size   : Bits32)
   -> (offset : Int64)
-  -> (cb     : Ptr Fs -> PrimIO ())
+  -> (tag    : Ptr Bits8)
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_write_sync")
 prim__uv_fs_write_sync :
      Ptr Loop
   -> (file   : Int32)
-  -> (bufs   : Ptr Buf)
-  -> (nbufs  : Bits32)
+  -> (buf    : Buffer)
+  -> (size   : Bits32)
   -> (offset : Int64)
   -> PrimIO Int32
 
@@ -468,6 +471,10 @@ prim__uv_fs_lchown :
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
+
+export %inline
+uv_fs_cleanup : Ptr Fs -> IO ()
+uv_fs_cleanup fp = primIO $ prim__uv_fs_cleanup fp
 
 parameters {auto has : HasIO io}
 
@@ -707,18 +714,16 @@ parameters {auto has : HasIO io}
   ||| Writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
   export %inline
-  uv_fs_write :
+  uv_fs_write_cb :
        Ptr Loop
-    -> Ptr Fs
     -> (file   : Int32)
-    -> (bufs   : Ptr Buf)
-    -> (nbufs  : Bits32)
+    -> (buf    : Buffer)
+    -> (size   : Bits32)
     -> (offset : Int64)
-    -> (cb     : Ptr Fs -> IO ())
+    -> (tag    : Ptr Bits8)
     -> io Int32
-  uv_fs_write l f h bufs nbufs offset act =
-    primIO $ prim__uv_fs_write l f h bufs nbufs offset $
-      \fp => toPrim (act fp)
+  uv_fs_write_cb l h buf size offset tag =
+    primIO $ prim__uv_fs_write_cb l h buf size offset tag
 
   ||| Synchronously writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
@@ -726,16 +731,12 @@ parameters {auto has : HasIO io}
   uv_fs_write_sync :
        Ptr Loop
     -> (file   : Int32)
-    -> (bufs   : Ptr Buf)
-    -> (nbufs  : Bits32)
+    -> (buf    : Buffer)
+    -> (size   : Bits32)
     -> (offset : Int64)
     -> io Int32
   uv_fs_write_sync l h bufs nbufs offset =
     primIO $ prim__uv_fs_write_sync l h bufs nbufs offset
-
-  export %inline
-  uv_fs_req_cleanup : Ptr Fs -> io ()
-  uv_fs_req_cleanup fp = primIO $ prim__uv_fs_req_cleanup fp
 
   export %inline
   uv_fs_stat :

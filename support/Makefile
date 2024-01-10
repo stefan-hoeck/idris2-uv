@@ -15,10 +15,11 @@ else
  LDFLAGS += -fuse-ld=gold
 endif
 
+all: $(TARGET)
+
+
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
-
-all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) -shared $(LDFLAGS) -o $@ $^

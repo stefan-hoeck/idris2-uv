@@ -1,7 +1,7 @@
 build/
 *.*~
 lib/
-support/idris2-uv.o
+support/*.o
 support/libuv-idris
 data/codegen/error_gen
 data/codegen/run_mode_gen
