@@ -258,27 +258,8 @@ prim__uv_fs_open :
   -> (cb : AnyPtr)
   -> PrimIO Int32
 
-%foreign (idris_uv "uv_fs_open_sync")
-prim__uv_fs_open_sync :
-     Ptr Loop
-  -> Ptr Fs
-  -> String
-  -> (flags,mode : Bits32)
-  -> PrimIO Int32
-
-%foreign (idris_uv "uv_fs_read")
+%foreign (idris_uv "idris_uv_fs_read")
 prim__uv_fs_read :
-     Ptr Loop
-  -> Ptr Fs
-  -> (file   : Int32)
-  -> (bufs   : Ptr Buf)
-  -> (nbufs  : Bits32)
-  -> (offset : Int64)
-  -> (cb     : AnyPtr)
-  -> PrimIO Int32
-
-%foreign (idris_uv "uv_fs_write_async")
-prim__uv_fs_write_async :
      Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
@@ -288,13 +269,15 @@ prim__uv_fs_write_async :
   -> (cb     : AnyPtr)
   -> PrimIO Int32
 
-%foreign (idris_uv "uv_fs_write_sync")
-prim__uv_fs_write_sync :
+%foreign (idris_uv "idris_uv_fs_write")
+prim__uv_fs_write :
      Ptr Loop
+  -> Ptr Fs
   -> (file   : Int32)
-  -> (bufs   : Ptr Buf)
-  -> (nbufs  : Bits32)
+  -> (buf    : Buffer)
+  -> (size   : Bits32)
   -> (offset : Int64)
+  -> (cb     : AnyPtr)
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_close")
@@ -304,9 +287,6 @@ prim__uv_fs_close :
   -> (file : Int32)
   -> (cb   : AnyPtr)
   -> PrimIO Int32
-
-%foreign (idris_uv "uv_fs_close_sync")
-prim__uv_fs_close_sync : Ptr Loop -> (file : Int32) -> PrimIO Int32
 
 %foreign (idris_uv "uv_fs_rename")
 prim__uv_fs_rename :
@@ -660,9 +640,6 @@ parameters {auto has : HasIO io}
   ||| Asynchronously closes a file and releases the file handle.
   |||
   ||| Once the file is closed, the given `IO` action is invoked.
-  ||| Note: Consider using the synchronous version `uv_fs_close_sync`
-  ||| instead for simplicity.
-  ||| Closing a file will probably not have a significant blocking effect.
   export %inline
   uv_fs_close : Ptr Loop -> Ptr Fs -> Int32 -> FsCB -> io Int32
   uv_fs_close l fs h cb = do
@@ -682,19 +659,6 @@ parameters {auto has : HasIO io}
   uv_fs_open l ptr path fs m cb =
     primIO $ prim__uv_fs_open l ptr path fs m cb.address
 
-  ||| Synchronously opens a file, invoking the given callback once
-  ||| the file is ready.
-  export %inline
-  uv_fs_open_sync :
-       Ptr Loop
-    -> Ptr Fs
-    -> String
-    -> (flags : Bits32)
-    -> (mode  : Bits32)
-    -> io Int32
-  uv_fs_open_sync l ptr path fs m =
-    primIO $ prim__uv_fs_open_sync l ptr path fs m
-
   ||| Reads data from a file into the given buffer and invokes
   ||| the callback function once the data is ready.
   |||
@@ -707,18 +671,18 @@ parameters {auto has : HasIO io}
        Ptr Loop
     -> Ptr Fs
     -> (file   : Int32)
-    -> (bufs   : Ptr Buf)
-    -> (nbufs  : Bits32)
+    -> (buf    : Buffer)
+    -> (size   : Bits32)
     -> (offset : Int64)
     -> (cb     : FsCB)
     -> io Int32
-  uv_fs_read l f h bufs nbufs offset cb =
-    primIO $ prim__uv_fs_read l f h bufs nbufs offset cb.address
+  uv_fs_read l f h buf size offset cb =
+    primIO $ prim__uv_fs_read l f h buf size offset cb.address
 
   ||| Writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
   export %inline
-  uv_fs_write_async :
+  uv_fs_write :
        Ptr Loop
     -> Ptr Fs
     -> (file   : Int32)
@@ -727,8 +691,8 @@ parameters {auto has : HasIO io}
     -> (offset : Int64)
     -> (cb     : FsCB)
     -> io Int32
-  uv_fs_write_async l f h buf size offset cb =
-    primIO $ prim__uv_fs_write_async l f h buf size offset cb.address
+  uv_fs_write l f h buf size offset cb =
+    primIO $ prim__uv_fs_write l f h buf size offset cb.address
 
   export %inline
   uv_fs_req_cleanup : Ptr Fs -> io ()

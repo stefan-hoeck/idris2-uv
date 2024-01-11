@@ -3,8 +3,6 @@
 #ifndef SUPPORT_IDRIS2_UV_H_
 #define SUPPORT_IDRIS2_UV_H_
 
-uv_buf_t uv_deref_buf(uv_buf_t *ptr);
-
 char *uv_get_buf_base(uv_buf_t *buf);
 
 unsigned int uv_get_buf_len(uv_buf_t *buf);
@@ -17,20 +15,8 @@ void *uv_copy_buf(char *src, char *dest, int len);
 
 void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len);
 
-void *uv_close_sync(uv_handle_t *handle);
-
-int uv_fs_close_sync(uv_loop_t *loop, uv_file file);
-
-int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags,
-                    int mode);
-
-int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
-                     unsigned int nbufs, int64_t offset);
-
-int uv_fs_write_async(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb);
-
-int uv_EOF();
 
 // `addrinfo` setters and getters
 void *uv_set_ai_family(struct addrinfo *info, int family);

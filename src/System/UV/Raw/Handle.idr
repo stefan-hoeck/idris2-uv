@@ -19,9 +19,6 @@ prim__uv_is_closing : Ptr Handle -> PrimIO Int32
 %foreign (idris_uv "uv_close")
 prim__uv_close : Ptr Handle -> (Ptr Handle -> PrimIO ()) -> PrimIO ()
 
-%foreign (idris_uv "uv_close_sync")
-prim__uv_close_sync : Ptr Handle -> PrimIO ()
-
 %foreign (idris_uv "uv_ref")
 prim__uv_ref : Ptr Handle -> PrimIO ()
 
@@ -67,14 +64,6 @@ parameters {auto has   : HasIO io}
   export
   uv_close : Ptr t -> (Ptr Handle -> IO ()) -> io ()
   uv_close p f = primIO $ prim__uv_close (castPtr p) (\h => toPrim $ f h)
-
-  ||| Synchronously closes a handle.
-  |||
-  ||| This *must* be called before releasing the handle from memory,
-  ||| which can be done right after this function returns.
-  export
-  uv_close_sync : Ptr t -> io ()
-  uv_close_sync p = primIO $ prim__uv_close_sync (castPtr p)
 
   ||| Reference a handle.
   |||
