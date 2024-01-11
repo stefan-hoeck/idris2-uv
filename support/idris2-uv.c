@@ -16,19 +16,19 @@ void *uv_set_buf_base(uv_buf_t *buf, char *dat) { buf->base = dat; }
 void *uv_copy_buf(char *src, char *dest, int len) { memcpy(dest, src, len); }
 
 int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
-                  unsigned int size, uv_write_cb cb){
+                   unsigned int size, uv_write_cb cb) {
   uv_buf_t buf = uv_buf_init(data, size);
   return uv_write(wr, str, &buf, 1, cb);
 }
 
 int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
-                     unsigned int size, int64_t offset, uv_fs_cb cb){
+                      unsigned int size, int64_t offset, uv_fs_cb cb) {
   uv_buf_t buf = uv_buf_init(data, size);
   return uv_fs_write(loop, req, file, &buf, 1, offset, cb);
 }
 
 int idris_uv_fs_read(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
-                     unsigned int size, int64_t offset, uv_fs_cb cb){
+                     unsigned int size, int64_t offset, uv_fs_cb cb) {
   uv_buf_t buf = uv_buf_init(data, size);
   return uv_fs_read(loop, req, file, &buf, 1, offset, cb);
 }
@@ -58,9 +58,7 @@ int uv_get_ai_protocol(struct addrinfo *info) { return info->ai_protocol; }
 
 int uv_get_ai_flags(struct addrinfo *info) { return info->ai_flags; }
 
-struct sockaddr *uv_get_ai_addr(struct addrinfo *info) {
-  return info->ai_addr;
-}
+struct sockaddr *uv_get_ai_addr(struct addrinfo *info) { return info->ai_addr; }
 
 uint64_t uv_get_st_dev(uv_stat_t *stat) { return stat->st_dev; }
 

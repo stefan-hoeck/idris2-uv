@@ -14,10 +14,10 @@ void *uv_set_buf_len(uv_buf_t *buf, unsigned int length);
 void *uv_copy_buf(char *src, char *dest, int len);
 
 int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
-                  unsigned int size, uv_write_cb cb);
+                   unsigned int size, uv_write_cb cb);
 
 int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
-                     unsigned int size, int64_t offset, uv_fs_cb cb);
+                      unsigned int size, int64_t offset, uv_fs_cb cb);
 
 int idris_uv_fs_read(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb);
@@ -101,6 +101,7 @@ int64_t uv_get_tv_sec(uv_timespec_t time);
 
 int64_t uv_get_tv_nsec(uv_timespec_t time);
 
-int uv_queue_work_idris(uv_loop_t *loop, uv_work_t *req, uv_work_cb work_cb, uv_after_work_cb after_work_cb);
+int uv_queue_work_idris(uv_loop_t *loop, uv_work_t *req, uv_work_cb work_cb,
+                        uv_after_work_cb after_work_cb);
 
 #endif // SUPPORT_IDRIS2_UV_H_
