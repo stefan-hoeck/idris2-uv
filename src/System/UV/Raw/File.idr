@@ -5,6 +5,7 @@ import System.UV.Raw.Callback
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
+import System.UV.Raw.Req
 import System.UV.Raw.Util
 
 import public System.UV.Data.File
@@ -458,6 +459,10 @@ prim__uv_fs_lchown :
 -- API
 --------------------------------------------------------------------------------
 
+export %inline
+uv_fs_req_cleanup : HasIO io => Ptr Fs -> io ()
+uv_fs_req_cleanup fp = primIO $ prim__uv_fs_req_cleanup fp
+
 parameters {auto has : HasIO io}
 
   export
@@ -466,6 +471,33 @@ parameters {auto has : HasIO io}
     obj <- CO <$> primIO (prim__fs_callable (\x => toPrim $ f x))
     lockObject obj
     pure $ obj.cb
+
+  localCB : (Ptr Fs -> IO ()) -> io FsCB
+  localCB f =
+    fsCB $ \p => do
+      dat <- uv_req_get_data p
+      f p
+      uv_fs_req_cleanup p
+      freePtr p
+      unlockCB (the FsCB $ CB dat)
+
+  ||| Synchronously run a file system request.
+  export
+  sync : (Ptr Fs -> FsCB -> io a) -> io a
+  sync f = do
+    fs <- mallocPtr Fs
+    res <- f fs nullCB
+    freePtr fs
+    pure res
+
+  ||| Asynchronously run a file system request.
+  export
+  async : (Ptr Fs -> FsCB -> io a) -> (Ptr Fs -> IO ()) -> io a
+  async f cb = do
+    fscb <- localCB cb
+    p    <- mallocPtr Fs
+    uv_req_set_data p fscb.address
+    f p fscb
 
   ||| Returns the result code received after a file operation.
   export %inline
@@ -497,12 +529,12 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_mkdir :
        Ptr Loop
-    -> Ptr Fs
     -> String
     -> (mode : Int32)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_mkdir loop fs path mode cb =
+  uv_fs_mkdir loop path mode fs cb =
     primIO $ prim__uv_fs_mkdir loop fs path mode cb.address
 
   ||| Equivalent to mkdtemp(3). The result can be found as a null
@@ -510,11 +542,11 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_mkdtemp :
        Ptr Loop
-    -> Ptr Fs
     -> (tpl : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_mkdtemp loop fs tpl cb =
+  uv_fs_mkdtemp loop tpl fs cb =
     primIO $ prim__uv_fs_mkdtemp loop fs tpl cb.address
 
   ||| Equivalent to mkstemp(3). The result can be found as a null
@@ -522,22 +554,22 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_mkstemp :
        Ptr Loop
-    -> Ptr Fs
     -> (tpl : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_mkstemp loop fs tpl cb =
+  uv_fs_mkstemp loop tpl fs cb =
     primIO $ prim__uv_fs_mkstemp loop fs tpl cb.address
 
   ||| Equivalent to rmdir(2).
   export %inline
   uv_fs_rmdir :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_rmdir loop fs path cb =
+  uv_fs_rmdir loop path fs cb =
     primIO $ prim__uv_fs_rmdir loop fs path cb.address
 
   ||| Opens path as a directory stream. On success,
@@ -551,11 +583,11 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_opendir :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_opendir loop fs path cb =
+  uv_fs_opendir loop path fs cb =
     primIO $ prim__uv_fs_opendir loop fs path cb.address
 
   ||| Closes the directory stream represented by dir and frees the
@@ -563,11 +595,11 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_closedir :
        Ptr Loop
-    -> Ptr Fs
     -> (dir : Ptr Dir)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_closedir loop fs dir cb =
+  uv_fs_closedir loop dir fs cb =
     primIO $ prim__uv_fs_closedir loop fs dir cb.address
 
   ||| Iterates  over  the directory stream, dir, returned by a
@@ -585,11 +617,11 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_readdir :
        Ptr Loop
-    -> Ptr Fs
     -> (dir : Ptr Dir)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_readdir loop fs dir cb =
+  uv_fs_readdir loop dir fs cb =
     primIO $ prim__uv_fs_readdir loop fs dir cb.address
 
   ||| Equivalent to scandir(3), with a slightly different API.
@@ -608,12 +640,12 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_scandir :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (mode : Int32)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_scandir loop fs path mode cb =
+  uv_fs_scandir loop path mode fs cb =
     primIO $ prim__uv_fs_scandir loop fs path mode cb.address
 
   ||| See `uv_fs_scandir`.
@@ -641,8 +673,8 @@ parameters {auto has : HasIO io}
   |||
   ||| Once the file is closed, the given `IO` action is invoked.
   export %inline
-  uv_fs_close : Ptr Loop -> Ptr Fs -> Int32 -> FsCB -> io Int32
-  uv_fs_close l fs h cb = do
+  uv_fs_close : Ptr Loop -> Int32 -> Ptr Fs -> FsCB -> io Int32
+  uv_fs_close l h fs cb = do
     primIO $ prim__uv_fs_close l fs h cb.address
 
   ||| Asynchronously opens a file, invoking the given callback once
@@ -650,13 +682,13 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_open :
        Ptr Loop
-    -> Ptr Fs
     -> String
     -> (flags : Bits32)
     -> (mode  : Bits32)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_open l ptr path fs m cb =
+  uv_fs_open l path fs m ptr cb =
     primIO $ prim__uv_fs_open l ptr path fs m cb.address
 
   ||| Reads data from a file into the given buffer and invokes
@@ -669,63 +701,59 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_read :
        Ptr Loop
-    -> Ptr Fs
     -> (file   : Int32)
     -> (buf    : Buffer)
     -> (size   : Bits32)
     -> (offset : Int64)
+    -> Ptr Fs
     -> (cb     : FsCB)
     -> io Int32
-  uv_fs_read l f h buf size offset cb =
+  uv_fs_read l h buf size offset f cb =
     primIO $ prim__uv_fs_read l f h buf size offset cb.address
 
   ||| Writes data from the given buffer to a file and invokes
   ||| the callback function once the data is ready.
-  export %inline
+  export
   uv_fs_write :
        Ptr Loop
-    -> Ptr Fs
     -> (file   : Int32)
     -> (buf    : Buffer)
     -> (size   : Bits32)
     -> (offset : Int64)
+    -> (p      : Ptr Fs)
     -> (cb     : FsCB)
     -> io Int32
-  uv_fs_write l f h buf size offset cb =
-    primIO $ prim__uv_fs_write l f h buf size offset cb.address
-
-  export %inline
-  uv_fs_req_cleanup : Ptr Fs -> io ()
-  uv_fs_req_cleanup fp = primIO $ prim__uv_fs_req_cleanup fp
+  uv_fs_write l h buf size offset p cb =
+    primIO $ prim__uv_fs_write l p h buf size offset cb.address
 
   export %inline
   uv_fs_stat :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_stat loop fs path cb =
+  uv_fs_stat loop path fs cb =
     primIO $ prim__uv_fs_stat loop fs path cb.address
 
   export %inline
   uv_fs_fstat :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_fstat loop fs file cb =
+  uv_fs_fstat loop file fs cb =
     primIO $ prim__uv_fs_fstat loop fs file cb.address
 
   export %inline
   uv_fs_lstat :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_lstat loop fs path cb =
+  uv_fs_lstat loop path fs cb =
     primIO $ prim__uv_fs_lstat loop fs path cb.address
 
   ||| Equivalent to statfs(2). On success, a
@@ -737,22 +765,22 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_statfs :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> FsCB
     -> io Int32
-  uv_fs_statfs loop fs path cb =
+  uv_fs_statfs loop path fs cb =
     primIO $ prim__uv_fs_statfs loop fs path cb.address
 
   ||| Equivalent to rename(2).
   export %inline
   uv_fs_rename :
        Ptr Loop
-    -> Ptr Fs
     -> (path, newpath : String)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_rename loop fs path newpath cb =
+  uv_fs_rename loop path newpath fs cb =
     primIO $ prim__uv_fs_rename loop fs path newpath cb.address
 
   ||| Equivalent to fsync(2).
@@ -763,34 +791,34 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_fsync :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_fsync loop fs file cb =
+  uv_fs_fsync loop file fs cb =
     primIO $ prim__uv_fs_fsync loop fs file cb.address
 
   ||| Equivalent to fdatasync(2).
   export %inline
   uv_fs_fdatasync :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_fdatasync loop fs file cb =
+  uv_fs_fdatasync loop file fs cb =
     primIO $ prim__uv_fs_fdatasync loop fs file cb.address
 
   ||| Equivalent to ftruncate(2).
   export %inline
   uv_fs_ftruncate :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
     -> (offset : Int64)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_ftruncate loop fs file offset cb =
+  uv_fs_ftruncate loop file offset fs cb =
     primIO $ prim__uv_fs_ftruncate loop fs file offset cb.address
 
   ||| Copies a file from path to new_path.
@@ -819,108 +847,108 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_copyfile :
        Ptr Loop
-    -> Ptr Fs
     -> (path, newpath : String)
     -> (flags : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_copyfile loop fs path newpath flags cb =
+  uv_fs_copyfile loop path newpath flags fs cb =
     primIO $ prim__uv_fs_copyfile loop fs path newpath flags cb.address
 
   ||| Limited equivalent to sendfile(2).
   export %inline
   uv_fs_sendfile :
        Ptr Loop
-    -> Ptr Fs
     -> (outFile, inFile : Int32)
     -> (offset : Int64)
     -> (length : Bits32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_sendfile loop fs o i offset l cb =
+  uv_fs_sendfile loop o i offset l fs cb =
     primIO $ prim__uv_fs_sendfile loop fs o i offset l cb.address
 
   ||| Equivalent to access(2) on Unix. Windows uses GetFileAttributesW().
   export %inline
   uv_fs_access :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (mode : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_access loop fs path mode cb =
+  uv_fs_access loop path mode fs cb =
     primIO $ prim__uv_fs_access loop fs path mode cb.address
 
   ||| Equivalent to chmod(2) respectively.
   export %inline
   uv_fs_chmod :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (mode : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_chmod loop fs path mode cb =
+  uv_fs_chmod loop path mode fs cb =
     primIO $ prim__uv_fs_chmod loop fs path mode cb.address
 
   ||| Equivalent to fchmod(2) respectively.
   export %inline
   uv_fs_fchmod :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
     -> (mode : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_fchmod loop fs file mode cb =
+  uv_fs_fchmod loop file mode fs cb =
     primIO $ prim__uv_fs_fchmod loop fs file mode cb.address
 
   ||| Equivalent to utime(2).
   export %inline
   uv_fs_utime :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (atime, mtime : Double)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_utime loop fs path atime mtime cb =
+  uv_fs_utime loop path atime mtime fs cb =
     primIO $ prim__uv_fs_utime loop fs path atime mtime cb.address
 
   ||| Equivalent to futime(2).
   export %inline
   uv_fs_futime :
        Ptr Loop
-    -> Ptr Fs
     -> (file : Int32)
     -> (atime, mtime : Double)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_futime loop fs file atime mtime cb =
+  uv_fs_futime loop file atime mtime fs cb =
     primIO $ prim__uv_fs_futime loop fs file atime mtime cb.address
 
   ||| Equivalent to lutime(2).
   export %inline
   uv_fs_lutime :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (atime, mtime : Double)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_lutime loop fs path atime mtime cb =
+  uv_fs_lutime loop path atime mtime fs cb =
     primIO $ prim__uv_fs_lutime loop fs path atime mtime cb.address
 
   ||| Equivalent to link(2).
   export %inline
   uv_fs_link :
        Ptr Loop
-    -> Ptr Fs
     -> (path, newpath : String)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_link loop fs path newpath cb =
+  uv_fs_link loop path newpath fs cb =
     primIO $ prim__uv_fs_link loop fs path newpath cb.address
 
   ||| Equivalent to symlink(2).
@@ -936,23 +964,23 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_symlink :
        Ptr Loop
-    -> Ptr Fs
     -> (path, newpath : String)
     -> (flags : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_symlink loop fs path newpath flags cb =
+  uv_fs_symlink loop path newpath flags fs cb =
     primIO $ prim__uv_fs_symlink loop fs path newpath flags cb.address
 
   ||| Equivalent to readlink(2).  The resulting string is stored in req->ptr.
   export %inline
   uv_fs_readlink :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_readlink loop fs path cb =
+  uv_fs_readlink loop path fs cb =
     primIO $ prim__uv_fs_readlink loop fs path cb.address
 
   ||| Equivalent to realpath(3) on Unix. Windows uses
@@ -981,45 +1009,45 @@ parameters {auto has : HasIO io}
   export %inline
   uv_fs_realpath :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_realpath loop fs path cb =
+  uv_fs_realpath loop path fs cb =
     primIO $ prim__uv_fs_realpath loop fs path cb.address
 
   ||| Equivalent to chown(2).
   export %inline
   uv_fs_chown :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (uid, gid : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_chown loop fs path uid gid cb =
+  uv_fs_chown loop path uid gid fs cb =
     primIO $ prim__uv_fs_chown loop fs path uid gid cb.address
 
   ||| Equivalent to fchown(2).
   export %inline
   uv_fs_fchown :
        Ptr Loop
-    -> Ptr Fs
     -> (file : String)
     -> (uid, gid : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_fchown loop fs file uid gid cb =
+  uv_fs_fchown loop file uid gid fs cb =
     primIO $ prim__uv_fs_lchown loop fs file uid gid cb.address
 
   ||| Equivalent to lchown(2).
   export %inline
   uv_fs_lchown :
        Ptr Loop
-    -> Ptr Fs
     -> (path : String)
     -> (uid, gid : Int32)
+    -> Ptr Fs
     -> (cb   : FsCB)
     -> io Int32
-  uv_fs_lchown loop fs path uid gid cb =
+  uv_fs_lchown loop path uid gid fs cb =
     primIO $ prim__uv_fs_lchown loop fs path uid gid cb.address

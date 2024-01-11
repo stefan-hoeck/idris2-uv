@@ -30,10 +30,12 @@ parameters {auto has : HasIO io}
   uv_cancel : Ptr t -> io Int32
   uv_cancel req = primIO $ prim__uv_cancel (castPtr req)
 
+  ||| Returns the data associated with a request.
   export %inline
   uv_req_get_data : Ptr t -> io AnyPtr
   uv_req_get_data req = primIO $ prim__uv_req_get_data (castPtr req)
 
+  ||| Sets the data associated with a request.
   export %inline
   uv_req_set_data : Ptr t -> AnyPtr -> io ()
   uv_req_set_data req dat = primIO $ prim__uv_req_set_data (castPtr req) dat

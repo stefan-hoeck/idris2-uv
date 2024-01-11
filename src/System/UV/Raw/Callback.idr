@@ -39,7 +39,7 @@ lockObject (CO p) = primIO $ prim__lockobject p
 ||| garbage collection.
 export %inline
 unlockObject : HasIO io => CodeObject a -> io ()
-unlockObject (CO p) = primIO $ prim__lockobject p
+unlockObject (CO p) = primIO $ prim__unlockobject p
 
 ||| An address (pointer) to a foreign callable Chez scheme code object.
 public export

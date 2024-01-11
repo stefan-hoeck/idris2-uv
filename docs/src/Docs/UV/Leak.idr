@@ -12,31 +12,24 @@ import System.UV.Raw.Pointer
 
 %default total
 
-test : Ptr Loop -> IORef FsCB -> IORef Nat -> IO ()
-test loop fscb counter = do
-  S k    <- readIORef counter | 0 => pure ()
-  c      <- readIORef fscb
-  fs     <- mallocPtr Fs
+cb : Nat -> Ptr Loop -> Ptr Fs -> IO ()
+
+testAsync : Nat -> Ptr Loop -> IO ()
+testAsync 0     loop = pure ()
+testAsync (S k) loop = do
+  let bs := the ByteString $ fromString . (++ "\n") . show $ S k
+  buf <- toBuffer bs
+  ignore $ async (uv_fs_write loop 1 buf (cast bs.size) (-1)) (cb k loop)
+
+testSync : Nat -> Ptr Loop -> IO ()
+testSync 0     loop = pure ()
+testSync (S k) loop = do
   let bs := the ByteString $ fromString . (++ "\n") . show $ S k
   buf    <- toBuffer bs
-  writeIORef counter k
-  ignore $ uv_fs_write_async loop fs 1 buf (cast bs.size) (-1) c
+  ignore . sync $ uv_fs_write loop 1 buf (cast bs.size) (-1)
+  testSync k loop
 
-testSync : Ptr Loop -> Nat -> IO ()
-testSync loop 0 = pure ()
-testSync loop (S k) = do
-  fs     <- mallocPtr Fs
-  let bs := the ByteString $ fromString . (++ "\n") . show $ S k
-  buf    <- toBuffer bs
-  ignore $ uv_fs_write_async loop fs 1 buf (cast bs.size) (-1) nullCB
-  freePtr fs
-  testSync loop k
-
-cb : IORef FsCB -> IORef Nat -> Ptr Loop -> Ptr Fs -> IO ()
-cb fscb counter loop fs = do
-  uv_fs_req_cleanup fs
-  freePtr fs
-  test loop fscb counter
+cb counter loop _ = testAsync counter loop
 
 count : IO Nat
 count = do
@@ -46,16 +39,8 @@ count = do
 
 main : IO ()
 main = do
-  putStrLn "Hello async"
   loop    <- uv_default_loop
-  putStrLn "Initialized loop"
-  counter <- count >>= newIORef
-  putStrLn "Initialized counter"
-  cbRef   <- newIORef {a = FsCB} nullCB
-  putStrLn "Initialized cb ref"
-  fscl    <- fsCB (cb cbRef counter loop)
-  writeIORef cbRef fscl
-  test loop cbRef counter
+  counter <- count
+  testAsync counter loop
   _ <- uv_run loop 0
-  testSync loop 20
   pure ()
