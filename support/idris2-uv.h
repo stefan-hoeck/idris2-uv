@@ -18,6 +18,9 @@ void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len);
 int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb);
 
+int idris_uv_fs_read(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+                     unsigned int size, int64_t offset, uv_fs_cb cb);
+
 // `addrinfo` setters and getters
 void *uv_set_ai_family(struct addrinfo *info, int family);
 
