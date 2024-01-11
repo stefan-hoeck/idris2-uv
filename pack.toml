@@ -18,3 +18,9 @@ ipkg = "test.ipkg"
 type = "local"
 path = "docs"
 ipkg = "uv-docs.ipkg"
+
+[custom.all.bytestring]
+type   = "git"
+url    = "git@github.com:stefan-hoeck/idris2-bytestring"
+commit = "latest:main"
+ipkg   = "bytestring.ipkg"

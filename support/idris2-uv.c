@@ -15,6 +15,8 @@ void *uv_set_buf_base(uv_buf_t *buf, char *dat) { buf->base = dat; }
 
 void *uv_copy_buf(char *src, char *dest, int len) { memcpy(dest, src, len); }
 
+void *uv_copy_from_buf(char *src, char *dest, int len, int offset) { memcpy(dest, src + offset, len); }
+
 int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
                    unsigned int size, uv_write_cb cb) {
   uv_buf_t buf = uv_buf_init(data, size);

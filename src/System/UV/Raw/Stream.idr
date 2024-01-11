@@ -1,7 +1,5 @@
 module System.UV.Raw.Stream
 
-import Data.Buffer
-
 import System.UV.Raw.Callback
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
@@ -34,7 +32,7 @@ prim__uv_read_stop : Ptr Stream -> PrimIO Int32
 prim__uv_write :
      Ptr Write
   -> Ptr Stream
-  -> Buffer
+  -> Ptr Bits8
   -> Bits32
   -> AnyPtr
   -> PrimIO Int32
@@ -66,6 +64,13 @@ parameters {auto has : HasIO io}
   export %inline
   allocCB : (Ptr Handle -> Bits32 -> Ptr Buf -> IO ()) -> io AllocCB
   allocCB = map AC . ptrUintPtrCB
+
+  export
+  sizedAlloc : Bits32 -> io AllocCB
+  sizedAlloc s =
+    allocCB $ \_,_,buf => do
+      cs <- mallocPtrs Bits8 s
+      initBuf buf cs s
 
   export
   defaultAlloc : io AllocCB
@@ -151,7 +156,7 @@ parameters {auto has : HasIO io}
   uv_write :
        Ptr t
     -> {auto 0 cstt : PCast t Stream}
-    -> Buffer
+    -> Ptr Bits8
     -> Bits32
     -> (Ptr Write -> Int32 -> IO ())
     ->  io Int32

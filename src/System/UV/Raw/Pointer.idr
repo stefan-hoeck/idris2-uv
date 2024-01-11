@@ -61,8 +61,8 @@ uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 %foreign (idris_uv "uv_copy_buf")
 uv_copy_to_buf : Ptr Bits8 -> Buffer -> Bits32 -> PrimIO ()
 
-%foreign (idris_uv "uv_copy_buf")
-uv_copy_from_buf : Buffer -> Ptr Bits8 -> Bits32 -> PrimIO ()
+%foreign (idris_uv "uv_copy_from_buf")
+uv_copy_from_buf : Buffer -> Ptr Bits8 -> (size, offset : Bits32) -> PrimIO ()
 
 %foreign "scheme:blodwen-buffer-getstring"
 uv_get_string : Ptr Bits8 -> (offset, len : Bits32) -> PrimIO String
@@ -325,18 +325,23 @@ export %inline
 freeBufBase : HasIO io => Ptr Buf -> io ()
 freeBufBase buf = getBufBase buf >>= freePtr
 
-||| Copy the given number of bytes from a `uv_buf_t` to an Idris-managed
+||| Copy the given number of bytes from a byte array to an Idris-managed
 ||| buffer.
 export
-copyToBuffer : HasIO io => Ptr Buf -> Buffer -> Bits32 -> io ()
-copyToBuffer p buf x = do
-  pchar <- getBufBase p
-  primIO $ uv_copy_to_buf pchar buf x
+copyToBuffer : HasIO io => Ptr Bits8 -> Buffer -> Bits32 -> io ()
+copyToBuffer p buf x = primIO $ uv_copy_to_buf p buf x
+
+||| Copy the given number of bytes from a byte array to an Idris-managed
+||| buffer.
+export
+copyBufToBuffer : HasIO io => Ptr Buf -> Buffer -> Bits32 -> io ()
+copyBufToBuffer p buf s = getBufBase p >>= \x => copyToBuffer x buf s
 
 ||| Copy the given number of bytes an Idris-managed
-||| buffer to a `uv_buf_t`.
+||| buffer to a `Ptr Char`
 export
-copyFromBuffer : HasIO io => Buffer -> Ptr Buf -> Bits32 -> io ()
-copyFromBuffer buf p x = do
-  pchar <- getBufBase p
-  primIO $ uv_copy_from_buf buf pchar x
+copyFromBuffer : HasIO io => Buffer -> (size, offset : Bits32) -> io (Ptr Bits8)
+copyFromBuffer buf size offset = do
+  pchar <- mallocPtrs Bits8 size
+  primIO $ uv_copy_from_buf buf pchar size offset
+  pure pchar

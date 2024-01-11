@@ -74,11 +74,11 @@ parameters {auto l   : UVLoop}
   export
   writeBytesAt : File -> (offset : Int64) -> ByteString -> Async es ()
   writeBytesAt h offset bs =
-    uvAsync $ \cb => do
-      buf <- toBuffer bs
-      async
-        (uv_fs_write l.loop h.file buf (cast bs.size) offset)
-        (writeOutcome cb)
+    use1 (fromByteString bs) $ \cs =>
+      uvAsync $ \cb => do
+        async
+          (uv_fs_write l.loop h.file cs (cast bs.size) offset)
+          (writeOutcome cb)
 
   export %inline
   writeBytes : File -> ByteString -> Async es ()
@@ -160,15 +160,19 @@ parameters {auto l   : UVLoop}
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
 
-  readOutcome : Buffer -> (Outcome es ByteString -> IO ()) -> Ptr Fs -> IO ()
-  readOutcome b cb = fsOutcome (cb . map (\n => unsafeByteString (cast n) b))
+  readOutcome : Ptr Bits8 -> (Outcome es ByteString -> IO ()) -> Ptr Fs -> IO ()
+  readOutcome cs cb =
+    fsOutcome {es} $ \case
+      Succeeded res => toByteString cs (cast res) >>= cb . Succeeded
+      Error err => cb (Error err)
+      Canceled  => cb Canceled
 
   export
   readBytes : File -> Bits32 -> Async es ByteString
   readBytes f size =
-    uvAsync $ \cb => do
-      buf <- newBuffer size
-      async (uv_fs_read l.loop f.file buf size (-1)) (readOutcome buf cb)
+    use1 (mallocPtrs Bits8 size) $ \cs =>
+      uvAsync $ \cb => do
+        async (uv_fs_read l.loop f.file cs size (-1)) (readOutcome cs cb)
 
   export
   readStdIn : Async es ByteString

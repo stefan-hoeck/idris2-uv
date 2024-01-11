@@ -1,6 +1,5 @@
 module System.UV.Raw.File
 
-import Data.Buffer
 import System.UV.Raw.Callback
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
@@ -261,7 +260,7 @@ prim__uv_fs_read :
      Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
-  -> (buf    : Buffer)
+  -> (buf    : Ptr Bits8)
   -> (size   : Bits32)
   -> (offset : Int64)
   -> (cb     : AnyPtr)
@@ -272,7 +271,7 @@ prim__uv_fs_write :
      Ptr Loop
   -> Ptr Fs
   -> (file   : Int32)
-  -> (buf    : Buffer)
+  -> (buf    : Ptr Bits8)
   -> (size   : Bits32)
   -> (offset : Int64)
   -> (cb     : AnyPtr)
@@ -696,7 +695,7 @@ parameters {auto has : HasIO io}
   uv_fs_read :
        Ptr Loop
     -> (file   : Int32)
-    -> (buf    : Buffer)
+    -> (buf    : Ptr Bits8)
     -> (size   : Bits32)
     -> (offset : Int64)
     -> Ptr Fs
@@ -711,7 +710,7 @@ parameters {auto has : HasIO io}
   uv_fs_write :
        Ptr Loop
     -> (file   : Int32)
-    -> (buf    : Buffer)
+    -> (buf    : Ptr Bits8)
     -> (size   : Bits32)
     -> (offset : Int64)
     -> (p      : Ptr Fs)

@@ -2,9 +2,9 @@ module System.UV.Raw.Pipe
 
 import System.UV.Raw.Callback
 import System.UV.Raw.Handle
-import System.UV.Raw.Req
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
+import System.UV.Raw.Req
 import System.UV.Raw.Util
 
 %default total

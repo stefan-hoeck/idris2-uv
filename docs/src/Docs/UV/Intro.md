@@ -249,7 +249,7 @@ file and invoke a callback once the file is ready.
 Let's implement `onOpen` next.
 
 ```idris
-onRead : Ptr Loop -> Buffer -> Int32 -> Ptr Fs -> IO ()
+onRead : Ptr Loop -> Ptr Bits8 -> Int32 -> Ptr Fs -> IO ()
 
 onOpen loop openFS = do
   res <- uv_fs_get_result openFS
@@ -261,7 +261,7 @@ onOpen loop openFS = do
      else do
        putStrLn "File opened successfully for reading"
        -- allocating the read buffer
-       buf    <- newBuffer 0xffff
+       buf    <- mallocPtrs Bits8 0xffff
        ignore $ async (uv_fs_read loop res buf 0xffff (-1)) (onRead loop buf res)
 ```
 
@@ -386,9 +386,8 @@ onStreamRead loop stream res pbuf = do
   if res < 0
      then when (fromCode res /= EOF) (putStrLn "Error: \{errorMsg $ fromCode res}")
      else do
-       buf <- newBuffer (cast res)
-       copyToBuffer pbuf buf (cast res)
-       ignore $ async' (uv_fs_write loop 1 buf (cast res) (-1))
+       buf <- getBufBase pbuf
+       ignore $ async (uv_fs_write loop 1 buf (cast res) (-1)) (\_ => freePtr buf)
 
 streamExample : IO ()
 streamExample = do
@@ -506,10 +505,8 @@ echoRead cc client nread pbuf =
   if nread >= 0
      then do
        putStrLn "Got \{show nread} bytes of data"
-       buf <- newBuffer (cast nread)
-       copyToBuffer pbuf buf (cast nread)
-       freeBufBase pbuf
-       ignore $ uv_write client buf (cast nread) (\_,_ => pure ())
+       buf <- getBufBase pbuf
+       ignore $ uv_write client buf (cast nread) (\_,_ => freePtr buf)
      else do
        putStrLn "Closing connection to client"
        freeBufBase pbuf
@@ -550,13 +547,11 @@ parameters {auto cc : CloseCB}
     if res < 0
        then when (fromCode res /= EOF)
               (putStrLn "Error: \{errorMsg $ fromCode res}") >>
+            freeBufBase pbuf >>
             ignore (uv_close stream cc)
        else do
-         buf <- newBuffer (cast res)
-         copyToBuffer pbuf buf (cast res)
-         ignore . async' $ uv_fs_write loop 1 buf (cast res) (-1)
-
-    freeBufBase pbuf
+         buf <- getBufBase pbuf
+         ignore $ async (uv_fs_write loop 1 buf (cast res) (-1)) (\_ => freePtr buf)
 
   onClientWrite : Ptr Loop -> Ptr Tcp -> Ptr Write -> Int32 -> IO ()
   onClientWrite loop client write status = do
@@ -568,8 +563,8 @@ parameters {auto cc : CloseCB}
        then putStrLn "New connection error: \{errorMsg $ fromCode status}"
        else do
          -- putStrLn "Got a new connection."
-         let bs := the ByteString $ fromString "Hello? Anybody out there?\n"
-         buf <- toBuffer bs
+         let bs := the ByteString "Hello? Anybody out there?\n"
+         buf <- fromByteString bs
          ignore $ uv_write client buf (cast bs.size) (onClientWrite loop client)
 
 clientExample : IO ()
