@@ -34,39 +34,39 @@ export %inline
 stderr : File
 stderr = MkFile 2
 
-export %inline
-fsClose : HasIO io => (l : UVLoop) => File -> io ()
-fsClose f = ignore $ uv_fs_close_sync l.loop f.file
-
-export %inline
-UVLoop => Resource File where
-  release = fsClose
-
-export
-Resource (Ptr Fs) where
-  release p = uv_fs_req_cleanup p >> freePtr p
-
-parameters {auto l   : UVLoop}
-           {auto has : Has UVError es}
-
-  fileOutcome : (Outcome es File -> IO ()) -> Ptr Fs -> IO ()
-  fileOutcome cb p = do
-    n <- uv_fs_get_result p
-    if n < 0
-      then cb (Error . inject $ fromCode n)
-      else cb (Succeeded $ MkFile n)
-
-  ||| Asynchronously opens a file.
-  export
-  fsOpen : String -> Flags -> Mode -> Async es File
-  fsOpen path f m = do
-    use1 (mallocPtr Fs) $ \fs =>
-      uvAsync $ uv_fs_open l.loop fs path f.flags m.mode . fileOutcome
-
---------------------------------------------------------------------------------
--- File Writing
---------------------------------------------------------------------------------
-
+-- export %inline
+-- fsClose : HasIO io => (l : UVLoop) => File -> io ()
+-- fsClose f = ignore $ uv_fs_close_sync l.loop f.file
+--
+-- export %inline
+-- UVLoop => Resource File where
+--   release = fsClose
+--
+-- export
+-- Resource (Ptr Fs) where
+--   release p = uv_fs_req_cleanup p >> freePtr p
+--
+-- parameters {auto l   : UVLoop}
+--            {auto has : Has UVError es}
+--
+--   fileOutcome : (Outcome es File -> IO ()) -> Ptr Fs -> IO ()
+--   fileOutcome cb p = do
+--     n <- uv_fs_get_result p
+--     if n < 0
+--       then cb (Error . inject $ fromCode n)
+--       else cb (Succeeded $ MkFile n)
+--
+--   ||| Asynchronously opens a file.
+--   export
+--   fsOpen : String -> Flags -> Mode -> Async es File
+--   fsOpen path f m = do
+--     use1 (mallocPtr Fs) $ \fs =>
+--       uvAsync $ uv_fs_open l.loop fs path f.flags m.mode . fileOutcome
+--
+-- --------------------------------------------------------------------------------
+-- -- File Writing
+-- --------------------------------------------------------------------------------
+--
 -- parameters {auto l   : UVLoop}
 --            {auto has : Has UVError es}
 --
