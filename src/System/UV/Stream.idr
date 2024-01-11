@@ -23,9 +23,9 @@ import System.UV.Raw.Stream
 --     Left (Here err) => pure (Err err)
 --     Right n         => Data <$> toByteString buf (cast n)
 --
--- export
--- Resource (Ptr Stream) where
---   release h = uv_close h freePtr
+export
+(cc : CloseCB) => Resource (Ptr Stream) where
+  release h = uv_close h cc
 --
 -- parameters {auto l : UVLoop}
 --            {auto has : Has UVError es}
