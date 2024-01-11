@@ -1,6 +1,8 @@
 module System.UV.Raw.Pipe
 
+import System.UV.Raw.Callback
 import System.UV.Raw.Handle
+import System.UV.Raw.Req
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
@@ -21,12 +23,7 @@ prim__uv_pipe_open : Ptr Pipe -> (file : Int32) -> PrimIO Int32
 prim__uv_pipe_bind : Ptr Pipe -> String -> PrimIO Int32
 
 %foreign (idris_uv "uv_pipe_connect")
-prim__uv_pipe_connect :
-     Ptr Connect
-  -> Ptr Pipe
-  -> String
-  -> (Ptr Connect -> Int32 -> PrimIO ())
-  -> PrimIO ()
+prim__uv_pipe_connect : Ptr Connect -> Ptr Pipe -> String -> AnyPtr -> PrimIO ()
 
 %foreign (idris_uv "uv_pipe_getsockname")
 prim__uv_pipe_getsockname : Ptr Pipe -> Ptr Char -> Ptr Bits32 -> PrimIO Int32
@@ -58,11 +55,11 @@ parameters {auto has : HasIO io}
   uv_pipe_open p f = primIO $ prim__uv_pipe_open p f
 
   ||| Bind the pipe to a file path (Unix) or a name (Windows).
-  ||| 
+  |||
   ||| Does not support Linux abstract namespace sockets, unlike uv_pipe_bind2().
-  ||| 
+  |||
   ||| Alias for uv_pipe_bind2(handle, name, strlen(name), 0).
-  ||| 
+  |||
   ||| NOTE:
   |||    Paths on Unix get truncated to sizeof(sockaddr_un.sun_path) bytes,
   |||    typically between 92 and 108 bytes.
@@ -70,22 +67,24 @@ parameters {auto has : HasIO io}
   uv_pipe_bind : Ptr Pipe -> String -> io Int32
   uv_pipe_bind p f = primIO $ prim__uv_pipe_bind p f
 
-  
+
   ||| Connect to the Unix domain socket or the Windows named pipe.
-  ||| 
+  |||
   ||| Does not support Linux abstract namespace sockets, unlike uv_pipe_connect2().
-  ||| 
+  |||
   ||| Alias for uv_pipe_connect2(req, handle, name, strlen(name), 0, cb).
-  ||| 
+  |||
   ||| NOTE:
   |||    Paths on Unix get truncated to sizeof(sockaddr_un.sun_path) bytes,
   |||    typically between 92 and 108 bytes.
-  export %inline
+  export
   uv_pipe_connect :
-       Ptr Connect
-    -> Ptr Pipe
+       Ptr Pipe
     -> String
     -> (Ptr Connect -> Int32 -> IO ())
     -> io ()
-  uv_pipe_connect pc pp name act =
-    primIO $ prim__uv_pipe_connect pc pp name $ \p,res => toPrim (act p res)
+  uv_pipe_connect pp name act = do
+    pc <- mallocPtr Connect
+    cb <- ptrIntCB (\x,y => act x y >> freeReq x)
+    uv_req_set_data pc cb
+    primIO $ prim__uv_pipe_connect pc pp name cb

@@ -40,10 +40,11 @@ defaultLoop = do
   let loop := MkLoop l tg ref
 
   pc  <- mallocPtr Idle
+  cc  <- defaultClose
   r1  <- uv_idle_init l pc
   r2  <- uv_idle_start pc $ \x => do
            readIORef ref >>= \case
-             [<] => ignore (uv_idle_stop x) >> uv_close x freePtr
+             [<] => ignore (uv_idle_stop x) >> uv_close x cc
              ss  => writeIORef ref [<] >> traverse_ eval (ss <>> [])
   pure loop
 

@@ -1,5 +1,6 @@
 module System.UV.Raw.Req
 
+import System.UV.Raw.Callback
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
@@ -39,3 +40,10 @@ parameters {auto has : HasIO io}
   export %inline
   uv_req_set_data : Ptr t -> AnyPtr -> io ()
   uv_req_set_data req dat = primIO $ prim__uv_req_set_data (castPtr req) dat
+
+  export
+  freeReq : Ptr t -> io ()
+  freeReq p = do
+    d <- uv_req_get_data p
+    unlockAnyPtr d
+    freePtr p

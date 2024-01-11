@@ -1,5 +1,6 @@
 module System.UV.Raw.Handle
 
+import System.UV.Raw.Callback
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
 import System.UV.Raw.Util
@@ -17,7 +18,7 @@ prim__uv_is_active : Ptr Handle -> PrimIO Int32
 prim__uv_is_closing : Ptr Handle -> PrimIO Int32
 
 %foreign (idris_uv "uv_close")
-prim__uv_close : Ptr Handle -> (Ptr Handle -> PrimIO ()) -> PrimIO ()
+prim__uv_close : Ptr Handle -> AnyPtr -> PrimIO ()
 
 %foreign (idris_uv "uv_ref")
 prim__uv_ref : Ptr Handle -> PrimIO ()
@@ -45,6 +46,12 @@ uv_handle_type_name : Int -> String
 -- API
 --------------------------------------------------------------------------------
 
+export
+record CloseCB where
+  [noHints]
+  constructor CC
+  ptr : AnyPtr
+
 parameters {auto has   : HasIO io}
            {auto 0 prf : PCast t Handle}
 
@@ -62,8 +69,8 @@ parameters {auto has   : HasIO io}
   ||| which can be done from within the callback or after the callback
   ||| has returned.
   export
-  uv_close : Ptr t -> (Ptr Handle -> IO ()) -> io ()
-  uv_close p f = primIO $ prim__uv_close (castPtr p) (\h => toPrim $ f h)
+  uv_close : Ptr t -> CloseCB -> io ()
+  uv_close p cb = primIO $ prim__uv_close (castPtr p) cb.ptr
 
   ||| Reference a handle.
   |||
@@ -100,3 +107,22 @@ parameters {auto has   : HasIO io}
   export %inline
   uv_handle_type : Ptr t -> io Int
   uv_handle_type p = primIO $ prim__uv_handle_type (castPtr p)
+
+  export
+  freeHandle : Ptr t -> io ()
+  freeHandle p = do
+    d <- uv_handle_get_data p
+    unlockAnyPtr d
+    freePtr p
+
+||| Allocates and locks a callback for closing handles.
+|||
+||| The callback will run any custom operations given in the
+||| `handler` argument before freeing the `Ptr Handle` from memory.
+export %inline
+closeCB : HasIO io => (handler : Ptr Handle -> IO ()) -> io (CloseCB)
+closeCB f = map CC $ ptrCB (\x => f x >> freeHandle x)
+
+export
+defaultClose : HasIO io => io CloseCB
+defaultClose = closeCB $ \_ => pure ()

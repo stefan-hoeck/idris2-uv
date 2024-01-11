@@ -9,68 +9,68 @@ import System.UV.Raw.TCP
 
 %default total
 
-export
-Resource (Ptr SockAddrIn) where
-  release = freePtr
-
-export
-Resource (Ptr Tcp) where
-  release h = uv_close h freePtr
-
-||| Convert a binary structure containing an IPv4 address to a string.
-export
-ip4name : Ptr SockAddrIn -> IO String
-ip4name p = do
-  cs <- mallocPtrs Char 256
-  r  <- uv_ip4_name p cs 255
-  let res = getString cs
-  freePtr cs
-  pure res
-
-||| Convert a binary structure containing an IPv6 address to a string.
-export
-ip6name : Ptr SockAddrIn6 -> IO String
-ip6name p = do
-  cs <- mallocPtrs Char 256
-  r  <- uv_ip6_name p cs 255
-  let res = getString cs
-  freePtr cs
-  pure res
-
-||| Convert a binary structure containing an IPv4 address or an
-||| IPv6 address to a string.
-export
-ipname : Ptr SockAddr -> IO String
-ipname p = do
-  cs <- mallocPtrs Char 256
-  r  <- uv_ip_name p cs 255
-  let res = getString cs
-  freePtr cs
-  pure res
-
-parameters {auto l : UVLoop}
-           {auto has : Has UVError es}
-
-  export
-  mkTcp : Async es (Ptr Tcp)
-  mkTcp = mallocPtr Tcp >>= uvAct (uv_tcp_init l.loop)
-
-  export
-  bindTcp : Ptr SockAddrIn -> Async es (Ptr Tcp)
-  bindTcp addr = mkTcp >>= uvAct (\x => uv_tcp_bind x addr 0)
-
-  export
-  acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
-  acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
-
-  export covering
-  listenTcp :
-       (addresss : String)
-    -> (port     : Bits16)
-    -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es (Fiber es a)
-  listenTcp address port run =
-    use1 (mallocPtr SockAddrIn) $ \addr => do
-      uv (uv_ip4_addr address port addr)
-      server <- bindTcp addr
-      listen server run
+-- export
+-- Resource (Ptr SockAddrIn) where
+--   release = freePtr
+--
+-- export
+-- Resource (Ptr Tcp) where
+--   release h = uv_close h freePtr
+--
+-- ||| Convert a binary structure containing an IPv4 address to a string.
+-- export
+-- ip4name : Ptr SockAddrIn -> IO String
+-- ip4name p = do
+--   cs <- mallocPtrs Char 256
+--   r  <- uv_ip4_name p cs 255
+--   let res = getString cs
+--   freePtr cs
+--   pure res
+--
+-- ||| Convert a binary structure containing an IPv6 address to a string.
+-- export
+-- ip6name : Ptr SockAddrIn6 -> IO String
+-- ip6name p = do
+--   cs <- mallocPtrs Char 256
+--   r  <- uv_ip6_name p cs 255
+--   let res = getString cs
+--   freePtr cs
+--   pure res
+--
+-- ||| Convert a binary structure containing an IPv4 address or an
+-- ||| IPv6 address to a string.
+-- export
+-- ipname : Ptr SockAddr -> IO String
+-- ipname p = do
+--   cs <- mallocPtrs Char 256
+--   r  <- uv_ip_name p cs 255
+--   let res = getString cs
+--   freePtr cs
+--   pure res
+--
+-- parameters {auto l : UVLoop}
+--            {auto has : Has UVError es}
+--
+--   export
+--   mkTcp : Async es (Ptr Tcp)
+--   mkTcp = mallocPtr Tcp >>= uvAct (uv_tcp_init l.loop)
+--
+--   export
+--   bindTcp : Ptr SockAddrIn -> Async es (Ptr Tcp)
+--   bindTcp addr = mkTcp >>= uvAct (\x => uv_tcp_bind x addr 0)
+--
+--   export
+--   acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
+--   acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
+--
+--   export covering
+--   listenTcp :
+--        (addresss : String)
+--     -> (port     : Bits16)
+--     -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
+--     -> Async es (Fiber es a)
+--   listenTcp address port run =
+--     use1 (mallocPtr SockAddrIn) $ \addr => do
+--       uv (uv_ip4_addr address port addr)
+--       server <- bindTcp addr
+--       listen server run

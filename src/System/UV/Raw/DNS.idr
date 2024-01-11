@@ -1,8 +1,10 @@
 module System.UV.Raw.DNS
 
+import System.UV.Raw.Callback
 import System.UV.Raw.Handle
-import System.UV.Raw.Pointer
 import System.UV.Raw.Loop
+import System.UV.Raw.Pointer
+import System.UV.Raw.Req
 import System.UV.Raw.Util
 
 import public System.UV.Data.DNS
@@ -47,7 +49,7 @@ prim__uv_freeaddrinfo : Ptr AddrInfo -> PrimIO ()
 prim__uv_getaddrinfo :
      Ptr Loop
   -> Ptr GetAddrInfo
-  -> (Ptr GetAddrInfo -> Int32 -> Ptr AddrInfo -> PrimIO ())
+  -> AnyPtr
   -> (node, service : String)
   -> (hints : Ptr AddrInfo)
   -> PrimIO Int32
@@ -56,7 +58,7 @@ prim__uv_getaddrinfo :
 prim__uv_getnameinfo :
      Ptr Loop
   -> Ptr GetNameInfo
-  -> (Ptr GetAddrInfo -> Int32 -> (hostname, servie : Ptr Char) -> PrimIO ())
+  -> AnyPtr
   -> Ptr SockAddr
   -> (flags : Int32)
   -> PrimIO Int32
@@ -110,21 +112,25 @@ parameters {auto has : HasIO io}
   export %inline
   uv_getaddrinfo :
        Ptr Loop
-    -> Ptr GetAddrInfo
     -> (Ptr GetAddrInfo -> Int32 -> Ptr AddrInfo -> IO ())
     -> (node, service : String)
     -> (hints : Ptr AddrInfo)
     -> io Int32
-  uv_getaddrinfo l pa cb n s h =
-    primIO $ prim__uv_getaddrinfo l pa (\x,y,z => toPrim (cb x y z)) n s h
+  uv_getaddrinfo l act n s h = do
+    pa <- mallocPtr GetAddrInfo
+    cb <- ptrIntPtrCB (\x,y,z => act x y z >> freeReq x)
+    uv_req_set_data pa cb
+    primIO $ prim__uv_getaddrinfo l pa cb n s h
 
   export %inline
   uv_getnameinfo :
        Ptr Loop
-    -> Ptr GetNameInfo
     -> (Ptr GetAddrInfo -> Int32 -> (hostname, service : Ptr Char) -> IO ())
     -> Ptr SockAddr
     -> (flags : Int32)
     -> io Int32
-  uv_getnameinfo l pa cb sa flags =
-    primIO $ prim__uv_getnameinfo l pa (\a,x,h,s => toPrim $ cb a x h s) sa flags
+  uv_getnameinfo l act sa flags = do
+    pa <- mallocPtr GetNameInfo
+    cb <- ptrIntPtrPtrCB (\w,x,y,z => act w x y z >> freeReq w)
+    uv_req_set_data pa cb
+    primIO $ prim__uv_getnameinfo l pa cb sa flags

@@ -13,7 +13,8 @@ void *uv_set_buf_len(uv_buf_t *buf, unsigned int length);
 
 void *uv_copy_buf(char *src, char *dest, int len);
 
-void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len);
+int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
+                  unsigned int size, uv_write_cb cb);
 
 int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb);

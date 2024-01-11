@@ -58,9 +58,6 @@ uv_get_buf_len : Ptr Buf -> PrimIO Bits32
 %foreign (idris_uv "uv_get_buf_base")
 uv_get_buf_base : Ptr Buf -> PrimIO (Ptr Bits8)
 
-%foreign (idris_uv "uv_init_buf")
-uv_init_buf : Ptr Buf -> Ptr Bits8 -> Bits32 -> PrimIO ()
-
 %foreign (idris_uv "uv_copy_buf")
 uv_copy_to_buf : Ptr Bits8 -> Buffer -> Bits32 -> PrimIO ()
 
@@ -306,43 +303,27 @@ setBufLen : HasIO io => Ptr Buf -> Bits32 -> io ()
 setBufLen p s = primIO $ uv_set_buf_len p s
 
 export %inline
-setBufBase : HasIO io => Ptr Buf -> Ptr Bits8 -> io ()
-setBufBase p s = primIO $ uv_set_buf_base p s
-
-export %inline
 getBufLen : HasIO io => Ptr Buf -> io Bits32
 getBufLen p = primIO $ uv_get_buf_len p
+
+export %inline
+setBufBase : HasIO io => Ptr Buf -> Ptr Bits8 -> io ()
+setBufBase p s = primIO $ uv_set_buf_base p s
 
 export %inline
 getBufBase : HasIO io => Ptr Buf -> io (Ptr Bits8)
 getBufBase p = primIO $ uv_get_buf_base p
 
-export %inline
-initBuf : HasIO io => Ptr Buf -> Ptr Bits8 -> Bits32 -> io ()
-initBuf pbuf pcs len = primIO $ uv_init_buf pbuf pcs len
-
-||| Allocates a char array of the given length, wrapping it
-||| in an `uv_buf_t` that's being initialized.
 export
-mallocBuf : HasIO io => Bits32 -> io (Ptr Buf)
-mallocBuf size = do
-  buf <- mallocPtr Buf
-  cs  <- mallocPtrs Bits8 size
-  initBuf buf cs size
-  pure buf
+initBuf : HasIO io => Ptr Buf -> Ptr Bits8 -> Bits32 -> io ()
+initBuf pbuf pcs len = do
+  setBufBase pbuf pcs
+  setBufLen pbuf len
 
 ||| Frees the memory allocated for a `uv_buf_t`'s `base` field.
 export %inline
 freeBufBase : HasIO io => Ptr Buf -> io ()
 freeBufBase buf = getBufBase buf >>= freePtr
-
-||| Frees the memory allocated for a `uv_buf_t`'s `base` field
-||| as well as the pointer itself.
-|||
-||| Use this to release a `Ptr Buf` allocated with `mallocBuf`.
-export %inline
-freeBuf : HasIO io => Ptr Buf -> io ()
-freeBuf buf = freeBufBase buf >> freePtr buf
 
 ||| Copy the given number of bytes from a `uv_buf_t` to an Idris-managed
 ||| buffer.

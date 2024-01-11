@@ -15,6 +15,12 @@ void *uv_set_buf_base(uv_buf_t *buf, char *dat) { buf->base = dat; }
 
 void *uv_copy_buf(char *src, char *dest, int len) { memcpy(dest, src, len); }
 
+int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
+                  unsigned int size, uv_write_cb cb){
+  uv_buf_t buf = uv_buf_init(data, size);
+  return uv_write(wr, str, &buf, 1, cb);
+}
+
 int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb){
   uv_buf_t buf = uv_buf_init(data, size);
@@ -25,11 +31,6 @@ int idris_uv_fs_read(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
                      unsigned int size, int64_t offset, uv_fs_cb cb){
   uv_buf_t buf = uv_buf_init(data, size);
   return uv_fs_read(loop, req, file, &buf, 1, offset, cb);
-}
-
-void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len) {
-  *buf = uv_buf_init(base, len);
-  return buf;
 }
 
 // `addrinfo` setters and getters

@@ -11,10 +11,6 @@ import public System.UV.Raw.Pointer
 %default total
 
 export %inline
-Resource (Ptr Buf) where
-  release = freeBuf
-
-export %inline
 Resource (Ptr Bits8) where
   release = freePtr
 
@@ -41,16 +37,16 @@ export %inline
 toString : HasIO io => Ptr Buf -> Bits32 -> io String
 toString p s = toString <$> toByteString p s
 
-||| Allocates a `uv_buf_t` to hold the data in the given bytestring.
-export
-fromByteString : HasIO io => ByteString -> io (Ptr Buf)
-fromByteString bs = do
-  buf <- liftIO $ toBuffer bs
-  ptr <- mallocBuf (cast bs.size)
-  copyFromBuffer buf ptr (cast bs.size)
-  pure ptr
-
-||| Allocates a `uv_buf_t` to hold the data in the given bytestring.
-export %inline
-fromString : HasIO io => String -> io (Ptr Buf)
-fromString = fromByteString . fromString
+-- ||| Allocates a `uv_buf_t` to hold the data in the given bytestring.
+-- export
+-- fromByteString : HasIO io => ByteString -> io (Ptr Buf)
+-- fromByteString bs = do
+--   buf <- liftIO $ toBuffer bs
+--   ptr <- mallocBuf (cast bs.size)
+--   copyFromBuffer buf ptr (cast bs.size)
+--   pure ptr
+--
+-- ||| Allocates a `uv_buf_t` to hold the data in the given bytestring.
+-- export %inline
+-- fromString : HasIO io => String -> io (Ptr Buf)
+-- fromString = fromByteString . fromString
