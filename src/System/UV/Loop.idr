@@ -23,11 +23,16 @@ record UVLoop where
   constructor MkLoop
   loop : Ptr Loop
   tg   : TokenGen
+  cc   : CloseCB
   ref  : IORef (SnocList EvalST)
 
 export %inline %hint
 loopTokenGen : UVLoop => AsyncContext
 loopTokenGen @{l} = AC l.tg (\x => modifyIORef l.ref (:< x))
+
+export %inline %hint
+loopCloseCB : UVLoop => CloseCB
+loopCloseCB @{l} = l.cc
 
 ||| Returns the default loop, corresponding to `uv_default_loop`.
 export covering
@@ -36,11 +41,11 @@ defaultLoop = do
   l   <- uv_default_loop
   tg  <- newTokenGen
   ref <- newIORef {a = SnocList EvalST} [<]
+  cc  <- defaultClose
 
-  let loop := MkLoop l tg ref
+  let loop := MkLoop l tg cc ref
 
   pc  <- mallocPtr Idle
-  cc  <- defaultClose
   r1  <- uv_idle_init l pc
   r2  <- uv_idle_start pc $ \x => do
            readIORef ref >>= \case

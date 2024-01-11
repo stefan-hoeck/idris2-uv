@@ -45,6 +45,7 @@ prim__uv_check_stop : Ptr Check -> PrimIO Int32
 --------------------------------------------------------------------------------
 
 parameters {auto has : HasIO io}
+
   export %inline
   uv_idle_stop : Ptr Idle -> io Int32
   uv_idle_stop h = primIO $ prim__uv_idle_stop h
@@ -59,3 +60,33 @@ parameters {auto has : HasIO io}
     cb <- ptrCB f
     uv_handle_set_data p cb
     primIO $ prim__uv_idle_start p cb
+
+  export %inline
+  uv_check_stop : Ptr Check -> io Int32
+  uv_check_stop h = primIO $ prim__uv_check_stop h
+
+  export %inline
+  uv_check_init : Ptr Loop -> Ptr Check -> io Int32
+  uv_check_init l h = primIO $ prim__uv_check_init l h
+
+  export
+  uv_check_start : Ptr Check -> (Ptr Check -> IO ()) -> io Int32
+  uv_check_start p f = do
+    cb <- ptrCB f
+    uv_handle_set_data p cb
+    primIO $ prim__uv_check_start p cb
+
+  export %inline
+  uv_prepare_stop : Ptr Prepare -> io Int32
+  uv_prepare_stop h = primIO $ prim__uv_prepare_stop h
+
+  export %inline
+  uv_prepare_init : Ptr Loop -> Ptr Prepare -> io Int32
+  uv_prepare_init l h = primIO $ prim__uv_prepare_init l h
+
+  export
+  uv_prepare_start : Ptr Prepare -> (Ptr Prepare -> IO ()) -> io Int32
+  uv_prepare_start p f = do
+    cb <- ptrCB f
+    uv_handle_set_data p cb
+    primIO $ prim__uv_prepare_start p cb
