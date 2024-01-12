@@ -70,6 +70,9 @@ data Prim : List Type -> Type -> Type where
   -- spawn a new fiber with the given computation
   Start  : Async es a -> Prim es (Fiber es a)
 
+  -- out cancel state that can be used when spawning a new fiber.
+  Self   : Prim es (MVar CancelState)
+
   -- repeatedly poll the given `IO` action until int yields a `Just`
   Poll   : IO (Maybe $ Outcome es a) -> Prim es a
 
@@ -99,6 +102,7 @@ primType (CB f)    = "CB"
 primType (Start x) = "Start of \{type x}"
 primType (Poll x)  = "Poll"
 primType Cancel    = "Cancel"
+primType Self      = "Self"
 
 type (AP c x)   = "AP(\{disp c}) of \{primType x}"
 type (AB c x f) = "AB(\{disp c}) of \{type x}"
@@ -150,11 +154,22 @@ throw = fail . inject
 -- Cancelling fibers
 --------------------------------------------------------------------------------
 
-||| Sets the given computation's cancelability to "cancelable".
+||| Sets the given computation's cancelability to "cancelable" if it
+||| is currently at "parent".
+|||
+||| If you plan to enforce cancelability no matter what, use
+||| `strictCancelable`.
 export
 cancelable : Async es a -> Async es a
-cancelable (AP _ x)   = AP C x
-cancelable (AB _ x f) = AB C x f
+cancelable (AP P x)   = AP C x
+cancelable (AB P x f) = AB C x f
+cancelable x          = x
+
+||| Sets the given computation's cancelability to "cancelable".
+export
+strictCancelable : Async es a -> Async es a
+strictCancelable (AP _ x)   = AP C x
+strictCancelable (AB _ x f) = AB C x f
 
 ||| Sets the given computation's cancelability to "uncancelable".
 export
@@ -204,7 +219,7 @@ HasIO (Async es) where
 export
 catch : (HSum es -> Async fs a) -> Async es a -> Async fs a
 catch f as =
-  AB U as $ \case
+  AB U (cancelable as) $ \case
     Succeeded a => pure a
     Error err   => f err
     Canceled    => canceled
@@ -235,7 +250,7 @@ guarantee :
   -> (cleanup : Outcome es a -> Async [] ())
   -> Async es a
 guarantee as fun =
-  AB U as (\o => AB U (fun o) (\_ => sync $ pure o))
+  AB U (cancelable as) (\o => AB U (fun o) (\_ => sync $ pure o))
 
 ||| Guarantees to run the given cleanup hook in case a fiber
 ||| has been canceled.
@@ -375,6 +390,10 @@ export %inline
 raceEither : (x : Async es a) -> (y : Async es b) -> Async es (Either a b)
 raceEither x y = race (map Left x) (map Right y)
 
+export %inline
+self : Async es (MVar CancelState)
+self = AP P Self
+
 --------------------------------------------------------------------------------
 -- Evaluation
 --------------------------------------------------------------------------------
@@ -491,6 +510,8 @@ parameters {auto ctxt : AsyncContext}
           | MkIORes (Just v) w2 => MkIORes (Done b v) w2
      in MkIORes (Cede b . AP c $ Poll x) w2
 
+  prim m b c Self w = MkIORes (Done b $ Succeeded m) w
+
   prim m b c Cancel w = MkIORes (Done True Canceled) w
 
   step :
@@ -527,13 +548,22 @@ parameters {auto ctxt : AsyncContext}
 -- Running asynchronous computations
 --------------------------------------------------------------------------------
 
+export
+childOnAsync :
+     {auto ctxt : AsyncContext}
+  -> (parent : Maybe $ MVar CancelState)
+  -> Async es a
+  -> (Outcome es a -> IO ())
+  -> IO ()
+childOnAsync parent as cb = do
+  fb <- newFiber parent
+  eval (EST fb (guarantee as (liftIO . cb)) [])
+
 ||| Runs the given asynchronous computation to completion
 ||| invoking the given callback once it is done.
-export
+export %inline
 onAsync : AsyncContext => Async es a -> (Outcome es a -> IO ()) -> IO ()
-onAsync as cb = do
-  fb  <- newFiber Nothing
-  eval (EST fb (guarantee as (liftIO . cb)) [])
+onAsync = childOnAsync Nothing
 
 ||| Asynchronously runs the given computation to completion.
 export %inline

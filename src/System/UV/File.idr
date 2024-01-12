@@ -171,7 +171,7 @@ parameters {auto l   : UVLoop}
   readBytes : File -> Bits32 -> Async es ByteString
   readBytes f size =
     use1 (mallocPtrs Bits8 size) $ \cs =>
-      cancelable $ uvAsync $ \cb => do
+      uvAsync $ \cb => do
         async (uv_fs_read l.loop f.file cs size (-1)) (readOutcome cs cb)
 
   export
@@ -189,7 +189,7 @@ parameters {auto l   : UVLoop}
     -> (ByteString -> Async es (Maybe b))
     -> Async es (Maybe b)
   streamFileUntil {b} path size fun =
-    use1 (fsOpen path RDONLY 0) $ \h => cancelable $ go h
+    use1 (fsOpen path RDONLY 0) $ \h => go h
     where
       go : File -> Async es (Maybe b)
       go h = do
