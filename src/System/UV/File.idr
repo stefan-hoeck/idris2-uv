@@ -171,7 +171,7 @@ parameters {auto l   : UVLoop}
   readBytes : File -> Bits32 -> Async es ByteString
   readBytes f size =
     use1 (mallocPtrs Bits8 size) $ \cs =>
-      uvAsync $ \cb => do
+      cancelable $ uvAsync $ \cb => do
         async (uv_fs_read l.loop f.file cs size (-1)) (readOutcome cs cb)
 
   export

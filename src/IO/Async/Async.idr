@@ -33,6 +33,10 @@ disp C = "cancelable"
 disp P = "parent"
 disp U = "uncancelable"
 
+cancelNow : Bool -> Cancelability -> Bool
+cancelNow True C = True
+cancelNow _    _ = False
+
 --------------------------------------------------------------------------------
 -- Async data type
 --------------------------------------------------------------------------------
@@ -438,8 +442,8 @@ doneType Canceled = "Canceled"
 
 -- debug string for outcomes
 resDebugMsg : EvalRes es a -> String
-resDebugMsg (Cede b x) = "Cede of type \{type x} and depth \{show $ depth x}"
-resDebugMsg (Done b x) = "Done of type \{doneType x}"
+resDebugMsg (Cede b x) = "Cede (\{show b}) of type \{type x} and depth \{show $ depth x}"
+resDebugMsg (Done b x) = "Done (\{show b}) of type \{doneType x}"
 
 set : Cancelability -> Async es a -> Async es a
 set x (AP y z)   = AP (x <+> y) z
@@ -453,9 +457,11 @@ parameters {auto ctxt : AsyncContext}
     -> Cancelability
     -> Prim es a
     -> IO (EvalRes es a)
-  prim m b c (Sync x)    = Done b <$> x
+  prim m True C _ = pure (Done True Canceled)
 
-  prim m b c (CB f)      = do
+  prim m b c (Sync x) = Done b <$> x
+
+  prim m b c (CB f) = do
     x <- newDeferred
     f $ \case
       Succeeded (Just a) => ignore $ complete x (Succeeded a)
@@ -481,13 +487,13 @@ parameters {auto ctxt : AsyncContext}
     -> Bool
     -> View es a
     -> PrimIO (EvalRes es a)
-  step m True  (VP C _)     w = MkIORes (Done True Canceled) w
-  step m True  (VB C _ x f) w = step m True (toView . set x $ f Canceled) w
-  step m b     (VP c p)     w = toPrim (prim m b c p) w
-  step m b     (VB c p x f) w =
+  step m b (VP c p)     w = toPrim (prim m b c p) w
+  step m b (VB c p x f) w =
     let MkIORes o w2 := toPrim (prim m b c p) w
      in case o of
-          Done b2 z => step m b2 (toView . set x $ f z) w2
+          Done b2 z => case cancelNow b2 x of
+            True  => MkIORes (Done True Canceled) w2
+            False => step m b2 (toView . set x $ f z) w2
           Cede b2 z => MkIORes (Cede b2 $ AB x z f) w2
 
   export covering
@@ -495,7 +501,6 @@ parameters {auto ctxt : AsyncContext}
   eval (EST f act) = do
     cs  <- readMVar f.canceled
     res <- primIO (step f.canceled cs.canceled (toView $ set C act))
-    -- putStrLn (resDebugMsg res)
     case res of
       Cede b act' => cancel b f >> ctxt.submit (EST f act')
       Done b res  => cancel b f >> ignore (complete f.outcome res)
