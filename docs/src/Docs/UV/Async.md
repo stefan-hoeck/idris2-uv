@@ -61,7 +61,9 @@ parameters {auto l : UVLoop}
 
   idleExample : DocIO ()
   idleExample = do
+    putStrLn "Hello World"
     ref     <- newIORef 0
+    putStrLn "Starting the counter"
     counter <- onIdle (checkCounter ref)
 
     res     <- raceEither (onSignal SIGINT) (once 5000)
