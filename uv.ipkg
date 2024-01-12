@@ -7,23 +7,33 @@ depends = base >= 0.6.0
         , uv-data
         , elab-util
         , bytestring
+        , quantifiers-extra
+        , containers
 
-modules = System.UV
+modules = IO.Async
+        , IO.Async.Async
+        , IO.Async.CancelState
+        , IO.Async.Fiber
+        , IO.Async.MVar
+        , IO.Async.Outcome
+        , IO.Async.Resource
+        , IO.Async.Token
+
+        , System.UV
         , System.UV.DNS
-        , System.UV.Error
         , System.UV.File
-        , System.UV.Handle
+        , System.UV.Idle
         , System.UV.Loop
         , System.UV.Pipe
         , System.UV.Pointer
-        , System.UV.Req
-        , System.UV.Resource
         , System.UV.Signal
         , System.UV.Stream
         , System.UV.TCP
         , System.UV.Timer
         , System.UV.Util
+        , System.UV.Work
 
+        , System.UV.Raw.Callback
         , System.UV.Raw.File
         , System.UV.Raw.Handle
         , System.UV.Raw.Idle

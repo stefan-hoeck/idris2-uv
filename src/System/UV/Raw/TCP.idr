@@ -1,8 +1,10 @@
 module System.UV.Raw.TCP
 
+import System.UV.Raw.Callback
 import System.UV.Raw.Handle
-import System.UV.Raw.Pointer
 import System.UV.Raw.Loop
+import System.UV.Raw.Pointer
+import System.UV.Raw.Req
 import System.UV.Raw.Util
 
 %default total
@@ -34,7 +36,7 @@ prim__uv_tcp_connect :
      Ptr Connect
   -> Ptr Tcp
   -> Ptr SockAddr
-  -> (Ptr Connect -> Int32 -> PrimIO ())
+  -> AnyPtr
   -> PrimIO Int32
 
 %foreign (idris_uv "uv_ip4_addr")
@@ -78,7 +80,7 @@ parameters {auto has : HasIO io}
   ||| Enable / disable simultaneous asynchronous accept requests
   ||| that are queued by the operating system when listening for new TCP
   ||| connections.
-  ||| 
+  |||
   ||| This setting is used to tune a TCP server for the desired
   ||| performance. Having simultaneous accepts can significantly
   ||| improve the rate of accepting connections (which is why
@@ -91,12 +93,12 @@ parameters {auto has : HasIO io}
 
   ||| Bind the handle to an address and port. addr should point
   ||| to an initialized struct sockaddr_in or struct sockaddr_in6.
-  ||| 
+  |||
   ||| When the port is already taken, you can expect to see an UV_EADDRINUSE
   ||| error from uv_listen() or uv_tcp_connect(). That is, a successful call
   ||| to this function does not guarantee that the call to uv_listen() or
   ||| uv_tcp_connect() will succeed as well.
-  ||| 
+  |||
   ||| flags can contain UV_TCP_IPV6ONLY, in which case dual-stack support
   ||| is disabled and only IPv6 is used.
   export %inline
@@ -121,13 +123,15 @@ parameters {auto has : HasIO io}
   export %inline
   uv_tcp_connect :
        {auto 0 _ : PCast t SockAddr}
-    -> Ptr Connect
     -> Ptr Tcp
     -> Ptr t
     -> (Ptr Connect -> Int32 -> IO ())
     -> io Int32
-  uv_tcp_connect pc tcp sa act =
-    primIO $ prim__uv_tcp_connect pc tcp (castPtr sa) $ \p,n => toPrim (act p n)
+  uv_tcp_connect tcp sa act = do
+    pc <- mallocPtr Connect
+    cb <- ptrIntCB (\x,y => act x y >> freeReq x)
+    uv_req_set_data pc cb
+    primIO $ prim__uv_tcp_connect pc tcp (castPtr sa) cb
 
 --------------------------------------------------------------------------------
 -- Addresses
@@ -137,7 +141,7 @@ parameters {auto has : HasIO io}
   export %inline
   uv_ip4_addr : String -> Bits16 -> Ptr SockAddrIn -> io Int32
   uv_ip4_addr addr port ptr = primIO $ prim__uv_ip4_addr addr port ptr
-  
+
   ||| Convert a string containing an IPv6 address to a binary structure.
   export %inline
   uv_ip6_addr : String -> Bits16 -> Ptr SockAddrIn6 -> io Int32

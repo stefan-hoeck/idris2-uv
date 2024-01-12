@@ -2,7 +2,7 @@
 
 C library *libuv* is a library for event-driven asynchronous
 programming. It is used - and was primarily developed for use -
-by Node.js. This project, idris2-uv, provides bindings the
+by Node.js. This project, idris2-uv, provides bindings to the
 functionality of libuv to make its asynchronous model available
 to Idris2.
 
@@ -18,29 +18,38 @@ in two parts: Submodules of `System.UV.Raw` contain the raw
 FFI bindings to the underlying C library. Use these if you are
 planning to write your own abstractions on top of libuv. Note,
 however, that they come without the usual safety measures available
-to Idris programmers in general: Pointer will need to allocated
+to Idris programmers in general: Pointer will need to be allocated
 and freed explicitly, and the types used in the raw bindings
-are mostly restricted to those than can be passed to and from the
+are mostly restricted to those that can be passed to and from the
 C foreign function interface (FFI).
 
 ## A couple of basic Examples
 
-In accordance to what was said about manual,
+In accordance to what was said about manual
 resource management: Here is the *hello world* of libuv.
 
 ```idris
 module Docs.UV.Intro
 
+import Data.Buffer.Indexed
+import Data.ByteString
+
 import Data.IORef
+import Data.Nat
+
 import System
 import System.UV
 import System.UV.File
+import System.UV.Raw.Handle
 import System.UV.Raw.Idle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pipe
-import System.UV.Raw.TCP
+import System.UV.Raw.Req
 import System.UV.Raw.Signal
 import System.UV.Raw.Stream
+import System.UV.Raw.TCP
+import System.UV.Raw.Timer
+import System.UV.Work
 
 %default total
 
@@ -51,6 +60,9 @@ loopExample = do
   resRun   <- uv_run loop (toCode Default)
   resClose <- uv_loop_close loop
   freePtr loop
+
+-- main : IO ()
+-- main = loopExample
 ```
 
 While this an especially boring version of *hello world* (it
@@ -62,7 +74,7 @@ free pointers on regular occasions. That's tedious and error
 prone, so we will want to have a layer of sanity on top of
 that. We will talk about that further below.
 
-Second, most methods in libuv return a status code, that typically
+Second, most methods in libuv return a status code that typically
 is zero if all went well and negative in case of an error. We may
 want to have proper error handling on top of this.
 
@@ -72,13 +84,13 @@ running it with `uv_run`. There are a couple of important
 notes about running a loop: First of all, the event loop is
 single-threaded, that is, our program code is executed in
 a single thread. As such, it is safe to make use of shared
-mutable state where this is needed. However, the event loop
+mutable state where this is needed. However, the event loop is
 also asynchronous and non-blocking. This means, that IO
 actions we request from the event loop are not blocking
 the current thread, but are registered at the event loop
-and executed in the next cycle of the loop. Internally, libuv
+and executed in the next cycles of the loop. Internally, libuv
 makes use of threads for asynchronous file access, but this
-has no effect on the surface program we write except making it
+has no effect on the surface program we write except for making it
 fast and responsive.
 
 The example above can be somewhat simplified by using the default
@@ -122,10 +134,10 @@ idleExample = do
   handle   <- mallocPtr Idle
   _        <- uv_idle_init loop handle
   ref      <- newIORef 0
-  _        <- uv_idle_start handle (checkCounter 100_000 ref)
+  _        <- uv_idle_start handle (checkCounter 1_000_000 ref)
   _        <- uv_run loop (toCode Default)
   _        <- uv_loop_close loop
-  freePtr handle
+  freeHandle handle
 
 -- main : IO ()
 -- main = idleExample
@@ -133,7 +145,7 @@ idleExample = do
 
 You can try the example above by uncommenting the `main` function
 and running this file with `pack exec docs/src/Docs/UV/Intro.md`.
-You will see that we run 100'000 iterations of the event loop,
+You will see that we run 1'000'000 iterations of the event loop,
 printing some output at certain occasions and stopping the *idle*
 handle at the end.
 
@@ -143,7 +155,7 @@ ends.
 
 ### Catching Signals
 
-Let's another layer of complexity but adding a second way to abort our
+Let's add another layer of complexity by adding a second way to abort our
 application: We repeat the `idleExample` but with a larger value for
 the upper bound of the counter. In addition, we add a handle to catch
 `SIGINT` (pressing `Ctrl-C` at the console) that will also abort
@@ -177,8 +189,8 @@ signalExample = do
 
   -- cleaning up
   _          <- uv_loop_close loop
-  freePtr idler
-  freePtr killSwitch
+  freeHandle idler
+  freeHandle killSwitch
 
 -- main : IO ()
 -- main = signalExample
@@ -194,7 +206,7 @@ Everything about setting up the kill switch is similar to what we did with
 the idler, with one exception: The call to `uv_unref`. In libuv, the event
 loop runs as long as there are active *and* referenced handles. We
 un-reference the kill switch, because the idler should not be responsible
-of stopping all other handles. Feel free to remove the call to `uv_unref`
+for stopping all other handles. Feel free to remove the call to `uv_unref`
 and run the application again: It will not terminate even after the idler
 has finished. It won't even stop if you press `Ctrl-C`, because in the
 current version, the kill switch does not terminate itself.
@@ -217,8 +229,7 @@ onOpen : Ptr Loop -> Ptr Fs -> IO ()
 
 catFile : Ptr Loop -> String -> IO Int32
 catFile loop path = do
-  openFS <- mallocPtr Fs
-  uv_fs_open loop openFS path (flags RDONLY) 0 (onOpen loop)
+  async (uv_fs_open loop path (flags RDONLY) 0) (onOpen loop)
 
 fileExample : IO ()
 fileExample = do
@@ -238,14 +249,10 @@ file and invoke a callback once the file is ready.
 Let's implement `onOpen` next.
 
 ```idris
-onRead : Ptr Loop -> Ptr Buf -> Int32 -> Ptr Fs -> IO ()
+onRead : Ptr Loop -> Ptr Bits8 -> Int32 -> Ptr Fs -> IO ()
 
 onOpen loop openFS = do
   res <- uv_fs_get_result openFS
-
-  -- releasing resources
-  uv_fs_req_cleanup openFS
-  freePtr openFS
 
   -- checking result: < 0 means an error occured, otherwise, it's a
   -- file handle
@@ -253,11 +260,9 @@ onOpen loop openFS = do
      then putStrLn "Error when reading: \{errorMsg $ fromCode res}"
      else do
        putStrLn "File opened successfully for reading"
-       -- allocating the `uv_fs_t` for reading
-       readFS <- mallocPtr Fs
        -- allocating the read buffer
-       buf    <- mallocBuf 0xffff
-       ignore $ uv_fs_read loop readFS res buf 1 0 (onRead loop buf res)
+       buf    <- mallocPtrs Bits8 0xffff
+       ignore $ async (uv_fs_read loop res buf 0xffff (-1)) (onRead loop buf res)
 ```
 
 So, that's quite a lot of code for something as "simple" as reading a file.
@@ -276,11 +281,10 @@ to an `UVError` first. If all
 goes well, we have to issue a new asynchronous request. For this, we allocate
 another request pointer (`readFS`). We also need to allocate a byte
 array where the data read from the file can be stored: We allocate
-65535 bytes of data with `mallocBuf`. Finally, we invoke `uv_fs_read`.
-The two integer literals need some explanation: The `1` is the number
-of buffers we are passing (`buf` is a pointer to `uv_buf`, so this could
-also be pointing to an array of buffers), and the zero indicates the
-file position we want to read from.
+65535 bytes of data with `newBuffer`. Finally, we invoke `uv_fs_read`.
+The two integer literals need some explanation: The `0xffff` is the
+size of the buffer we are passing, and the `(-1)` indicates the
+file position we want to read from (the current position in this case).
 
 We still have to implement `onRead`. Let's do that next:
 
@@ -289,34 +293,31 @@ onRead loop buf file readFS = do
   res <- uv_fs_get_result readFS
 
   -- closing the file
-  _ <- uv_fs_close_sync loop file
-
-  -- releasing the file system request
-  uv_fs_req_cleanup readFS
-  freePtr readFS
+  _ <- sync $ uv_fs_close loop file
 
   if res < 0
      then putStrLn "Error opening file: \{errorMsg $ fromCode res}"
      else do
        putStrLn "Read \{show res} bytes of data\n"
-       fsWrite <- mallocPtr Fs
-       ignore $ uv_fs_write loop fsWrite 1 buf 1 (-1) $ \fs =>
-         freeBuf buf >> freePtr fs
+       ignore $ async' (uv_fs_write loop 1 buf (cast res) (-1))
 ```
 
 That's still more cleaning up of resources. In the end, we print the
 data we read to *stdout* (file handle 1) at offset `-1` (the current
 offset) and free the allocated buffer.
 
-In order to to simplify things, we closed the file.
+In order to simplify things, we closed the file synchronously. The
+same thing goes for writing to *sdtout* (represented by file handle `1`).
 This will block the event loop but for simple one-off operations
 like this, that's usually alright.
 Otherwise, we'd have to allocate and free even more stuff.
 
 Note, that we can run all file requests synchronously in libuv
-by passing the `NULL` pointer as the callback. We have to provide
-these version separately via the FFI, because we can't directly
-send `NULL` in place of a callback function across the FFI.
+by passing the `NULL` pointer as the callback. Since we do not work
+with callback pointers directly, even in the low-level API, module
+`System.UV.Raw.File` runs two utility higher-order functions called
+`async` and `sync`, which allow us to decide on which version of
+a request to run.
 
 ### Observing Asynchronisity
 
@@ -348,7 +349,7 @@ fileExample2 = do
   _     <- catFile loop p
   _     <- uv_run loop (toCode Default)
   _     <- uv_loop_close loop
-  freePtr idler
+  freeHandle idler
 
 -- main : IO ()
 -- main = fileExample2
@@ -375,17 +376,18 @@ machine.
 
 ```idris
 BufSize : Bits32
-BufSize = 0xffff
+BufSize = 0xfffff
 
 allocBuf : Ptr Bits8 -> Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
 allocBuf cs _ _ buf = initBuf buf cs BufSize
 
 onStreamRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
-onStreamRead loop stream res buf = do
+onStreamRead loop stream res pbuf = do
   if res < 0
      then when (fromCode res /= EOF) (putStrLn "Error: \{errorMsg $ fromCode res}")
-     else setBufLen buf (cast res) >>
-          ignore (uv_fs_write_sync loop 1 buf 1 (-1))
+     else do
+       buf <- getBufBase pbuf
+       ignore $ async (uv_fs_write loop 1 buf (cast res) (-1)) (\_ => freePtr buf)
 
 streamExample : IO ()
 streamExample = do
@@ -395,12 +397,11 @@ streamExample = do
   _    <- uv_pipe_init loop pipe False
   r    <- uv_pipe_open pipe 0
   cs   <- mallocPtrs Bits8 BufSize
-  _    <- uv_read_start pipe (allocBuf cs) (onStreamRead loop)
+  acb  <- allocCB (allocBuf cs)
+  _    <- uv_read_start pipe acb (onStreamRead loop)
   _    <- uv_run loop (toCode Default)
   ignore $ uv_loop_close loop
 
--- main : IO ()
--- main = streamExample
 ```
 
 Two new concepts appear in the code example above: Initialization of pipes
@@ -432,25 +433,14 @@ request and convert it to a response that will then be sent back
 to the client.
 
 ```idris
-allocEchoBuffer : Ptr Handle -> Bits32 -> Ptr Buf -> IO ()
-allocEchoBuffer _ size buf = do
-  cs <- mallocPtrs Bits8 size
-  initBuf buf cs size
+onNewConnection : AllocCB -> CloseCB -> Ptr Loop -> Ptr Stream -> Int32 -> IO ()
 
-onNewConnection : Ptr Loop -> Ptr Stream -> Int32 -> IO ()
+echoRead : CloseCB -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
 
-echoRead : Ptr Stream -> Int32 -> Ptr Buf -> IO ()
-
-echoWrite : Ptr Buf -> Ptr Write -> Int32 -> IO ()
-echoWrite buf req status = do
-  freePtr buf
-  freePtr req
-  when (status < 0) (putStrLn "Write error \{errorMsg $ fromCode status}")
-
-stopEcho : Ptr Tcp -> Ptr Signal -> Bits32 -> IO ()
-stopEcho server _ sig = do
+stopEcho : CloseCB -> Ptr Tcp -> Ptr Signal -> Bits32 -> IO ()
+stopEcho cc server _ sig = do
   putStrLn "Application interrupted by signal \{show sig} (SIGINT)."
-  ignore $ uv_close_sync server
+  ignore $ uv_close server cc
   putStrLn "Goodbye."
 
 echoExample : IO ()
@@ -459,6 +449,10 @@ echoExample = do
   server <- mallocPtr Tcp
   _      <- uv_tcp_init loop server
 
+  -- allocating callbacks
+  cc     <- defaultClose
+  ac     <- sizedAlloc 0xffff
+
   -- binding the server to local address 0.0.0.0 at port 7000
   addr   <- mallocPtr SockAddrIn
   _      <- uv_ip4_addr "0.0.0.0" 7000 addr
@@ -466,18 +460,17 @@ echoExample = do
 
   -- start listening (this actually will start when we run the event loop)
   putStrLn "Listening on 0.0.0.0 port 7000"
-  r      <- uv_listen server 128 (onNewConnection loop)
+  r      <- uv_listen server 128 (onNewConnection ac cc loop)
 
   -- setting up a kill switch
   kill   <- mallocPtr Signal
   _      <- uv_signal_init loop kill
   _      <- uv_unref kill
-  _      <- uv_signal_start kill (stopEcho server) (sigToCode SIGINT)
+  _      <- uv_signal_start kill (stopEcho cc server) (sigToCode SIGINT)
 
   when (r < 0) (die "Listen error: \{errorMsg $ fromCode r}")
   _      <- uv_run loop (toCode Default)
 
-  freePtr server
   freePtr addr
 ```
 
@@ -490,15 +483,15 @@ the application.
 Let's implement `onNewConnection` next:
 
 ```idris
-onNewConnection loop server status =
+onNewConnection ac cc loop server status =
   if status < 0
      then putStrLn "New connection error \{errorMsg $ fromCode status}"
      else do
        putStrLn "Got a new connection."
        client <- mallocPtr Tcp
        _      <- uv_tcp_init loop client
-       0      <- uv_accept server client | _ => uv_close client freePtr
-       ignore $ uv_read_start client allocEchoBuffer echoRead
+       0      <- uv_accept server client | _ => uv_close client cc
+       ignore $ uv_read_start client ac (echoRead cc)
 ```
 
 Upon receiving a client request, we setup and accept a new connection
@@ -508,25 +501,21 @@ case of an error, the connection to the client is properly closed.
 Finally, here's the implementation of `echoRead`:
 
 ```idris
-echoRead client nread buf =
-  if nread > 0
+echoRead cc client nread pbuf =
+  if nread >= 0
      then do
        putStrLn "Got \{show nread} bytes of data"
-       req  <- mallocPtr Write
-       wbuf <- mallocPtr Buf
-       dat  <- getBufBase buf
-       initBuf wbuf dat (cast nread)
-       ignore $ uv_write req client wbuf 1 (echoWrite wbuf)
+       buf <- getBufBase pbuf
+       ignore $ uv_write client buf (cast nread) (\_,_ => freePtr buf)
      else do
        putStrLn "Closing connection to client"
-       dat <- getBufBase buf
-       freePtr dat
-       uv_close client freePtr
+       freeBufBase pbuf
+       uv_close client cc
        when (fromCode nread /= EOF) $ do
          putStrLn "Read error \{errorMsg $ fromCode nread}"
 
--- main : IO ()
--- main = echoExample
+main : IO ()
+main = echoExample
 ```
 
 If we got some data, we typically process it and send a response to
@@ -537,7 +526,7 @@ We then invoke `uv_write`, which will asynchronously send our response
 back to the client. When we reach the end of client input, we free
 the allocated memory and close the connection on our end.
 
-The application above as an important shortcoming: When we decide to
+The application above has an important shortcoming: When we decide to
 shut down our server, the application will only terminate after every
 client session has ended. Since clients decide, when a session ends,
 this might take a long time. In a real world server we'd want to
@@ -550,32 +539,33 @@ Writing a TCP client is not much different from writing
 a server:
 
 ```idris
-onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
-onClientRead loop stream res buf = do
-  if res < 0
-     then when (fromCode res /= EOF)
-            (putStrLn "Error: \{errorMsg $ fromCode res}") >>
-          ignore (uv_close stream freePtr)
-     else setBufLen buf (cast res) >>
-          ignore (uv_fs_write_sync loop 1 buf 1 (-1))
+parameters {auto cc : CloseCB}
+           {auto ac : AllocCB}
 
-  getBufBase buf >>= freePtr
+  onClientRead : Ptr Loop -> Ptr Stream -> Int32 -> Ptr Buf -> IO ()
+  onClientRead loop stream res pbuf = do
+    if res < 0
+       then when (fromCode res /= EOF)
+              (putStrLn "Error: \{errorMsg $ fromCode res}") >>
+            freeBufBase pbuf >>
+            ignore (uv_close stream cc)
+       else do
+         buf <- getBufBase pbuf
+         ignore $ async (uv_fs_write loop 1 buf (cast res) (-1)) (\_ => freePtr buf)
 
-onClientWrite : Ptr Loop -> Ptr Tcp -> Ptr Write -> Int32 -> IO ()
-onClientWrite loop client write status = do
-  freePtr write
-  ignore $ uv_read_start client allocEchoBuffer (onClientRead loop)
+  onClientWrite : Ptr Loop -> Ptr Tcp -> Ptr Write -> Int32 -> IO ()
+  onClientWrite loop client write status = do
+    ignore $ uv_read_start client ac (onClientRead loop)
 
-onClientConnect : Ptr Loop -> Ptr Tcp -> Ptr Connect -> Int32 -> IO ()
-onClientConnect loop client connect status = do
-  freePtr connect
-  if status < 0
-     then putStrLn "New connection error: \{errorMsg $ fromCode status}"
-     else do
-       putStrLn "Got a new connection."
-       req  <- mallocPtr Write
-       dat  <- fromString "Hello? Anybody out there?\n"
-       ignore $ uv_write req client dat 1 (onClientWrite loop client)
+  onClientConnect : Ptr Loop -> Ptr Tcp -> Ptr Connect -> Int32 -> IO ()
+  onClientConnect loop client connect status = do
+    if status < 0
+       then putStrLn "New connection error: \{errorMsg $ fromCode status}"
+       else do
+         -- putStrLn "Got a new connection."
+         let bs := the ByteString "Hello? Anybody out there?\n"
+         buf <- fromByteString bs
+         ignore $ uv_write client buf (cast bs.size) (onClientWrite loop client)
 
 clientExample : IO ()
 clientExample = do
@@ -583,14 +573,17 @@ clientExample = do
   socket <- mallocPtr Tcp
   _      <- uv_tcp_init loop socket
 
+  -- allocating callbacks
+  cc     <- defaultClose
+  ac     <- sizedAlloc 0xffff
+
   -- binding the server to local address 0.0.0.0 at port 7000
   addr   <- mallocPtr SockAddrIn
-  _      <- uv_ip4_addr "localhost" 7000 addr
+  _      <- uv_ip4_addr "0.0.0.0" 7000 addr
 
   -- start listening (this actually will start when we run the event loop)
-  putStrLn "Connecting to 0.0.0.0 port 7000"
-  connect <- mallocPtr Connect
-  r       <- uv_tcp_connect connect socket addr (onClientConnect loop socket)
+  -- putStrLn "Connecting to 0.0.0.0 port 7000"
+  r       <- uv_tcp_connect socket addr (onClientConnect {cc,ac} loop socket)
 
   when (r < 0) (die "Connect error: \{errorMsg $ fromCode r}")
   _      <- uv_run loop (toCode Default)

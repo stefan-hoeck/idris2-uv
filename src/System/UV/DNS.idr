@@ -2,12 +2,10 @@ module System.UV.DNS
 
 import Derive.Prelude
 import System.FFI
-import System.UV.Error
-import System.UV.Handle
 import System.UV.Pointer
 import System.UV.Loop
 import System.UV.Util
-import public System.UV.Raw.DNS
+import System.UV.Raw.DNS
 
 %language ElabReflection
 %default total
@@ -23,27 +21,38 @@ record SockInfo where
   type     : SockType
   protocol : Protocol
 
-export %inline
-getAddrInfo :
-     {auto l : UVLoop}
-  -> (node, service : String)
-  -> SockInfo
-  -> (Either UVError (Ptr AddrInfo) -> IO ())
-  -> UVIO ()
-getAddrInfo n s (SI f t p) cb = do
-  hints <- mallocPtr AddrInfo
-  pg    <- mallocPtr GetAddrInfo
-  uv_set_ai_family   hints (familyCode f)
-  uv_set_ai_socktype hints (sockCode t)
-  uv_set_ai_protocol hints (protocolCode p)
-  res   <- uv_getaddrinfo
-    l.loop
-    pg
-    (\pa,st,pa => freePtr pa >> freePtr hints >> cb (uvRes st $> pa))
-    n
-    s
-    hints
+hints : HasIO io => SockInfo -> io (Ptr AddrInfo)
+hints (SI f t p) = do
+  hs <- mallocPtr AddrInfo
+  uv_set_ai_family   hs (familyCode f)
+  uv_set_ai_socktype hs (sockCode t)
+  uv_set_ai_protocol hs (protocolCode p)
+  pure hs
 
-  case uvRes res of
-    Left err => freePtr hints >> freePtr pg >> left err
-    Right _  => pure ()
+export
+Resource (Ptr AddrInfo) where
+  release = uv_freeaddrinfo
+
+export
+Resource (Ptr GetAddrInfo) where
+  release = freePtr
+
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+
+  gaCB :
+       (Outcome es (Ptr AddrInfo) -> IO ())
+    -> Ptr GetAddrInfo
+    -> Int32
+    -> Ptr AddrInfo
+    -> IO ()
+  gaCB cb _ st pa = do
+    case uvRes st of
+      Left err => uv_freeaddrinfo pa >> cb (Error err)
+      Right () => cb (Succeeded pa)
+
+  export
+  addrInfo : (node, service : String) -> SockInfo -> Async es (Ptr AddrInfo)
+  addrInfo n s h =
+    use1 (hints h) $ \hs => do
+      uvAsync $ \cb => uv_getaddrinfo l.loop (gaCB cb) n s hs

@@ -5,8 +5,6 @@
 #include <string.h>
 #include <uv.h>
 
-uv_buf_t uv_deref_buf(uv_buf_t *ptr) { return *ptr; }
-
 void *uv_set_buf_len(uv_buf_t *buf, unsigned int length) { buf->len = length; }
 
 unsigned int uv_get_buf_len(uv_buf_t *buf) { return buf->len; }
@@ -17,29 +15,26 @@ void *uv_set_buf_base(uv_buf_t *buf, char *dat) { buf->base = dat; }
 
 void *uv_copy_buf(char *src, char *dest, int len) { memcpy(dest, src, len); }
 
-int uv_fs_close_sync(uv_loop_t *loop, uv_file file) {
-  uv_fs_t req;
-  return uv_fs_close(loop, &req, file, NULL);
+void *uv_copy_from_buf(char *src, char *dest, int len, int offset) {
+    memcpy(dest, src + offset, len);
 }
 
-int uv_fs_open_sync(uv_loop_t *loop, uv_fs_t *req, const char *path, int flags,
-                    int mode) {
-  return uv_fs_open(loop, req, path, flags, mode, NULL);
+int idris_uv_write(uv_write_t *wr, uv_stream_t *str, char *data,
+                   unsigned int size, uv_write_cb cb) {
+  uv_buf_t buf = uv_buf_init(data, size);
+  return uv_write(wr, str, &buf, 1, cb);
 }
 
-void *uv_close_sync(uv_handle_t *handle) { uv_close(handle, NULL); }
-
-int uv_fs_write_sync(uv_loop_t *loop, uv_file file, const uv_buf_t bufs[],
-                     unsigned int nbufs, int64_t offset) {
-  uv_fs_t req;
-  int res = uv_fs_write(loop, &req, file, bufs, nbufs, offset, NULL);
-  uv_fs_req_cleanup(&req);
-  return res;
+int idris_uv_fs_write(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+                      unsigned int size, int64_t offset, uv_fs_cb cb) {
+  uv_buf_t buf = uv_buf_init(data, size);
+  return uv_fs_write(loop, req, file, &buf, 1, offset, cb);
 }
 
-void *uv_init_buf(uv_buf_t *buf, char *base, unsigned int len) {
-  *buf = uv_buf_init(base, len);
-  return buf;
+int idris_uv_fs_read(uv_loop_t *loop, uv_fs_t *req, uv_file file, char *data,
+                     unsigned int size, int64_t offset, uv_fs_cb cb) {
+  uv_buf_t buf = uv_buf_init(data, size);
+  return uv_fs_read(loop, req, file, &buf, 1, offset, cb);
 }
 
 // `addrinfo` setters and getters
@@ -67,9 +62,7 @@ int uv_get_ai_protocol(struct addrinfo *info) { return info->ai_protocol; }
 
 int uv_get_ai_flags(struct addrinfo *info) { return info->ai_flags; }
 
-struct sockaddr *uv_get_ai_addr(struct addrinfo *info) {
-  return info->ai_addr;
-}
+struct sockaddr *uv_get_ai_addr(struct addrinfo *i) {return i->ai_addr;}
 
 uint64_t uv_get_st_dev(uv_stat_t *stat) { return stat->st_dev; }
 

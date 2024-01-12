@@ -1,40 +1,34 @@
 module System.UV.Signal
 
-import Data.Fuel
-import System.UV.Error
-import System.UV.Handle
 import System.UV.Loop
 import System.UV.Pointer
-import System.UV.Resource
+import System.UV.Raw.Handle
 import public System.UV.Raw.Signal
 
 %default total
 
-start : Fuel -> IO Bool -> Resource -> Ptr Signal -> Bits32 -> UVIO ()
+parameters {auto cc : CloseCB}
+  export
+  Resource (Ptr Signal) where
+    release h = uv_close h cc
 
-go : Fuel -> IO Bool -> Resource -> Ptr Signal -> Bits32 -> IO ()
+  signal_stop : Ptr Signal -> Async [] ()
+  signal_stop pt =ignore (uv_signal_stop pt) >> release pt
 
-start f act res h c = uvio $ uv_signal_start h (go f act res) c
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+  export
+  mkSignal : Async es (Ptr Signal)
+  mkSignal = mallocPtr Signal >>= uvAct (uv_signal_init l.loop)
 
-go Dry      act res h c = release res
-go (More x) act res h c = do
-  True     <- act | False => release res
-  Right () <- runEitherT $ start x act res h c | Left _ => release res
-  pure ()
-
-||| Runs the given `IO` action each time the given signal
-||| is received until it either returns `False` or the `Fuel` runs dry.
-export
-repeatedlyOnSignal : (l : UVLoop) => Fuel -> SigCode -> IO Bool -> UVIO Resource
-repeatedlyOnSignal f c act = do
-  h <- mallocPtr Signal
-  uvio $ uv_signal_init l.loop h
-  res <- manageHandle h
-  start f act res h (sigToCode c)
-  pure res
-
-
-||| Runs the given `IO` action once when the given signal is received.
-export %inline
-onSignal : UVLoop => SigCode -> IO () -> UVIO Resource
-onSignal c act = repeatedlyOnSignal (limit 1) c (act $> False)
+  ||| Reacts on process signals.
+  |||
+  ||| Note: If used in a do-block this will semantically block the
+  |||       current fiber.
+  |||       Wrap this in `start` to run it in the background.
+  export covering
+  onSignal : SigCode -> Async es SigCode
+  onSignal c = do
+    ps <- mkSignal
+    uvOnce ps signal_stop $
+      \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)

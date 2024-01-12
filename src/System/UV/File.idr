@@ -1,13 +1,13 @@
 module System.UV.File
 
-import Data.Buffer.Indexed
-import Data.ByteString
 import Data.Buffer
-import System.UV.Error
-import System.UV.Handle
+import Data.Maybe
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Util
+
+import public Data.Buffer.Indexed
+import public Data.ByteString
 
 import public System.UV.Raw.File
 
@@ -34,205 +34,175 @@ export %inline
 stderr : File
 stderr = MkFile 2
 
-export
-releaseFs : HasIO io => Ptr Fs -> io ()
-releaseFs p = uv_fs_req_cleanup p >> freePtr p
-
-withFile : (Either UVError File -> IO ()) -> Ptr Fs -> IO ()
-withFile act p = do
-  n <- uv_fs_get_result p
-  releaseFs p
-  if n < 0 then act (Left $ fromCode n) else act (Right $ MkFile n)
-
-||| Asynchronously opens a file, invoking the given callback once
-||| the file is ready.
-export %inline
-fsOpen :
-     {auto l : UVLoop}
-  -> String
-  -> Flags
-  -> Mode
-  -> (Either UVError File -> IO ())
-  -> UVIO ()
-fsOpen path f m act = do
-  fs <- mallocPtr Fs
-  uvio $ uv_fs_open l.loop fs path f.flags m.mode (withFile act)
-
 export %inline
 fsClose : HasIO io => (l : UVLoop) => File -> io ()
-fsClose f = ignore $ uv_fs_close_sync l.loop f.file
+fsClose f = ignore . sync $ uv_fs_close l.loop f.file
 
---------------------------------------------------------------------------------
--- File Reading
---------------------------------------------------------------------------------
-
-public export
-data ReadRes : (a : Type) -> Type where
-  Err    : UVError -> ReadRes s
-  NoData : ReadRes a
-  Data   : a -> ReadRes a
-
-export
-Functor ReadRes where
-  map f (Err e)  = Err e
-  map f NoData   = NoData
-  map f (Data v) = Data $ f v
-
-export
-Foldable ReadRes where
-  foldl acc v (Err e)  = v
-  foldl acc v NoData   = v
-  foldl acc v (Data x) = acc v x
-
-  foldr acc v (Err e)  = v
-  foldr acc v NoData   = v
-  foldr acc v (Data x) = acc x v
-
-  foldMap f (Err e)  = neutral
-  foldMap f NoData   = neutral
-  foldMap f (Data x) = f x
-
-  toList (Err e)  = []
-  toList NoData   = []
-  toList (Data x) = [x]
-
-export
-Traversable ReadRes where
-  traverse f (Err e)  = pure $ Err e
-  traverse f NoData   = pure NoData
-  traverse f (Data x) = Data <$> f x
-
-export
-codeToRes : Int32 -> ReadRes Bits32
-codeToRes 0 = NoData
-codeToRes n = if n < 0 then Err (fromCode n) else Data (cast n)
-
-readRes : HasIO io => Ptr Buf -> Ptr Fs -> io (ReadRes ByteString)
-readRes buf fs = do
-  c <- uv_fs_get_result fs
-  traverse (toByteString buf) (codeToRes c)
-
-readAndReleaseRes : HasIO io => Ptr Buf -> Ptr Fs -> io (ReadRes ByteString)
-readAndReleaseRes buf fs = do
-  res <- readRes buf fs
-  freeBuf buf
-  releaseFs fs
-  pure res
-
-||| Asynchronously reads up to the given number of bytes from the given file.
-export
-fsReadBytes :
-     {auto l : UVLoop}
-  -> (file   : File)
-  -> (bytes  : Bits32)
-  -> (cb     : ReadRes ByteString -> IO ())
-  -> IO ()
-fsReadBytes f bytes cb = do
-  fr  <- mallocPtr Fs
-  buf <- mallocBuf bytes
-  res <- uv_fs_read l.loop fr f.file buf 1 0 $ \fr =>
-    readAndReleaseRes buf fr >>= cb
-  case uvRes res of
-    Left err => freeBuf buf >> releaseFs fr >> cb (Err err)
-    _        => pure ()
-
-||| Tries to open the given file and to
-||| asynchronously read up to the given number of bytes.
-export
-readBytes :
-     {auto l : UVLoop}
-  -> (path   : String)
-  -> (bytes  : Bits32)
-  -> (cb     : ReadRes ByteString -> IO ())
-  -> UVIO ()
-readBytes path bytes cb =
-  fsOpen path RDONLY neutral $
-    \case Left err => cb (Err err)
-          Right f  => fsReadBytes f bytes (\r => fsClose f >> cb r)
-
-||| Tries to open the given file and to
-||| asynchronously read up to the given number of bytes.
-|||
-||| The data read is interpreted as a UTF8-encoded string.
 export %inline
-readText :
-     {auto l : UVLoop}
-  -> (path   : String)
-  -> (bytes  : Bits32)
-  -> (cb     : ReadRes String -> IO ())
-  -> UVIO ()
-readText path bytes cb =
-  readBytes path bytes (cb . map toString)
+UVLoop => Resource File where
+  release = fsClose
+
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+
+  fsOutcome : (Outcome es Int32 -> IO ()) -> Ptr Fs -> IO ()
+  fsOutcome cb p = do
+    n <- uv_fs_get_result p
+    if n < 0
+      then cb (Error . inject $ fromCode n)
+      else cb (Succeeded n)
+
+  fileOutcome : (Outcome es File -> IO ()) -> Ptr Fs -> IO ()
+  fileOutcome cb = fsOutcome (cb . map MkFile)
+
+  ||| Asynchronously opens a file.
+  export
+  fsOpen : String -> Flags -> Mode -> Async es File
+  fsOpen path f m =
+    uvAsync $ async (uv_fs_open l.loop path f.flags m.mode) . fileOutcome
 
 --------------------------------------------------------------------------------
 -- File Writing
 --------------------------------------------------------------------------------
 
-export
-fsWriteBytesFrom :
-     {auto has : HasIO io}
-  -> {auto l : UVLoop}
-  -> File
-  -> ByteString
-  -> (offset : Int64)
-  -> (onErr : UVError -> IO ())
-  -> io ()
-fsWriteBytesFrom f dat offset onErr = do
-  buf <- fromByteString dat
-  res <- uv_fs_write_sync l.loop f.file buf 1 offset
-  freeBuf buf
-  liftIO $ onErr (fromCode res)
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
 
-export %inline
-fsWriteBytes :
-     {auto has : HasIO io}
-  -> {auto l : UVLoop}
-  -> File
-  -> ByteString
-  -> (onErr : UVError -> IO ())
-  -> io ()
-fsWriteBytes f dat onErr = fsWriteBytesFrom f dat (-1) onErr
+  writeOutcome : (Outcome es () -> IO ()) -> Ptr Fs -> IO ()
+  writeOutcome cb = fsOutcome (cb . ignore)
 
-export
-fsWrite :
-     {auto l : UVLoop}
-  -> (path : String)
-  -> ByteString
-  -> (onErr : UVError -> IO ())
-  -> UVIO ()
-fsWrite path dat onErr = do
-  fsOpen path (WRONLY <+> CREAT) neutral $
-    \case Left err => pure ()
-          Right f  => fsWriteBytes f dat onErr >> fsClose f
+  export
+  writeBytesAt : File -> (offset : Int64) -> ByteString -> Async es ()
+  writeBytesAt h offset bs =
+    use1 (fromByteString bs) $ \cs =>
+      uvAsync $ \cb => do
+        async
+          (uv_fs_write l.loop h.file cs (cast bs.size) offset)
+          (writeOutcome cb)
 
-export
-putOut : UVLoop => HasIO io => String -> io ()
-putOut s = fsWriteBytes stdout (fromString s) (const $ pure ())
+  export %inline
+  writeBytes : File -> ByteString -> Async es ()
+  writeBytes h = writeBytesAt h (-1)
 
-export %inline
-putOutLn : UVLoop => HasIO io => String -> io ()
-putOutLn s = putOut (s ++ "\n")
+  export %inline
+  writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
+  writeFile p fs m bs =
+    use1 (fsOpen p (WRONLY <+> fs) m) $ \h => writeBytes h bs
 
-export %inline
-printOut : UVLoop => HasIO io => Show a => a -> io ()
-printOut = putOut . show
+  export %inline
+  toFile : (path : String) -> ByteString -> Async es ()
+  toFile p = writeFile p CREAT 0o644
 
-export %inline
-printOutLn : UVLoop => HasIO io => String -> io ()
-printOutLn = putOutLn . show
+  export %inline
+  appendToFile : (path : String) -> ByteString -> Async es ()
+  appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
 
-export
-putErr : UVLoop => HasIO io => String -> io ()
-putErr s = fsWriteBytes stderr (fromString s) (const $ pure ())
+  ||| Writes all bytes to `stdout`.
+  export %inline
+  bytesOut : ByteString -> Async es ()
+  bytesOut = writeBytes stdout
 
-export %inline
-putErrLn : UVLoop => HasIO io => String -> io ()
-putErrLn s = putErr (s ++ "\n")
+  ||| Write some text to `stdout`.
+  export %inline
+  putOut : String -> Async es ()
+  putOut = bytesOut . fromString
 
-export %inline
-printErr : UVLoop => HasIO io => Show a => a -> io ()
-printErr = putErr . show
+  ||| Sink that writes all text to `stdout`, interpreting
+  ||| every item as a single line
+  export %inline
+  putOutLn : String -> Async es ()
+  putOutLn = putOut . (++ "\n")
 
-export %inline
-printErrLn : UVLoop => HasIO io => String -> io ()
-printErrLn = putErrLn . show
+  ||| Sink that printes values to `stdout` using their `Show`
+  ||| implementation.
+  export %inline
+  printOut : Show a => a -> Async es ()
+  printOut = putOut . show
+
+  ||| Sink that printes values to `stdout` using their `Show`
+  ||| implementation and putting every item on a single line.
+  export %inline
+  printOutLn : Show a => a -> Async es ()
+  printOutLn = putOutLn . show
+
+  ||| Writes all bytes to `stderr`.
+  export %inline
+  bytesErr : ByteString -> Async es ()
+  bytesErr = writeBytes stderr
+
+  ||| Write some text to `stderr`.
+  export %inline
+  putErr : String -> Async es ()
+  putErr = bytesErr . fromString
+
+  ||| Sink that writes all text to `stderr`, interpreting
+  ||| every item as a single line
+  export %inline
+  putErrLn : String -> Async es ()
+  putErrLn = putErr . (++ "\n")
+
+  ||| Sink that printes values to `stderr` using their `Show`
+  ||| implementation.
+  export %inline
+  printErr : Show a => a -> Async es ()
+  printErr = putErr . show
+
+  ||| Sink that printes values to `stderr` using their `Show`
+  ||| implementation and putting every item on a single line.
+  export %inline
+  printErrLn : Show a => a -> Async es ()
+  printErrLn = putErrLn . show
+
+--------------------------------------------------------------------------------
+-- File Reading
+--------------------------------------------------------------------------------
+
+parameters {auto l   : UVLoop}
+           {auto has : Has UVError es}
+
+  readOutcome : Ptr Bits8 -> (Outcome es ByteString -> IO ()) -> Ptr Fs -> IO ()
+  readOutcome cs cb =
+    fsOutcome {es} $ \case
+      Succeeded res => toByteString cs (cast res) >>= cb . Succeeded
+      Error err => cb (Error err)
+      Canceled  => cb Canceled
+
+  export
+  readBytes : File -> Bits32 -> Async es ByteString
+  readBytes f size =
+    use1 (mallocPtrs Bits8 size) $ \cs =>
+      cancelable $ uvAsync $ \cb => do
+        async (uv_fs_read l.loop f.file cs size (-1)) (readOutcome cs cb)
+
+  export
+  readStdIn : Async es ByteString
+  readStdIn = readBytes stdin 4096
+
+  export covering
+  readFile : (path : String) -> Bits32 -> Async es ByteString
+  readFile path n = use1 (fsOpen path RDONLY 0) (`readBytes` n)
+
+  export covering
+  streamFileUntil :
+       (path : String)
+    -> Bits32
+    -> (ByteString -> Async es (Maybe b))
+    -> Async es (Maybe b)
+  streamFileUntil {b} path size fun =
+    use1 (fsOpen path RDONLY 0) $ \h => cancelable $ go h
+    where
+      go : File -> Async es (Maybe b)
+      go h = do
+        v  <- readBytes h size
+        if null v
+           then pure Nothing
+           else fun v >>= maybe (go h) (pure . Just)
+
+  export covering
+  streamFile :
+       (path : String)
+    -> Bits32
+    -> (ByteString -> Async es ())
+    -> Async es (Maybe ())
+  streamFile path n fun =
+    streamFileUntil path n (\x => fun x $> Nothing)
