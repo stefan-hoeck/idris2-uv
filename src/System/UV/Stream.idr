@@ -34,7 +34,7 @@ export
 parameters {auto l : UVLoop}
            {auto has : Has UVError es}
 
-  export covering
+  export
   streamRead :
        AllocCB
     -> Ptr t
@@ -45,7 +45,7 @@ parameters {auto l : UVLoop}
     uvForever run h (\x => uv_read_stop x) $ \cb =>
       uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
 
-  export covering
+  export
   write :
        Ptr t
     -> {auto 0 cstt : PCast t Stream}
@@ -55,7 +55,7 @@ parameters {auto l : UVLoop}
     use1 (fromByteString b) $ \cs =>
       uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
 
-  export covering
+  export
   listen :
        Ptr t
     -> {auto 0 cstt : PCast t Stream}
