@@ -104,6 +104,14 @@ namely the idler that is still running.
 
 ## Streaming a File
 
+In this example we stream the content of one file to another.
+However, we provide three possibilities how the computation might
+stop: `SIGINT` is received, a ten seconds timeout occurs, or the
+input stream is exhausted.
+
+This shows, how we can conveniently set up a race of a
+heterogeneous list of asynchronous computations.
+
 ```idris
 parameters {auto l : UVLoop}
   fileStreamExample : DocIO ()
@@ -127,6 +135,11 @@ main = runDoc fileStreamExample
 
 ## An echo Server
 
+In this last example, we again set up a simple echo server.
+This time, however, the server gracefully closes all client
+connections before shutting down (which happens, when
+`SIGINT` is received).
+
 ```idris
 parameters {auto l : UVLoop}
   onConnection : AllocCB -> Ptr Stream -> DocIO (Maybe ())
@@ -135,7 +148,7 @@ parameters {auto l : UVLoop}
     client <- acceptTcp server
     _      <- streamReadWrite ac client $ \case
       Done     => pure (Just ())
-      Data val => bytesOut val >> write client val $> Nothing
+      Data val => write client val $> Nothing
       Err x    => throw x
     pure Nothing
 
