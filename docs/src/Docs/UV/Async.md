@@ -125,7 +125,7 @@ parameters {auto l : UVLoop}
   onConnection ac server = do
     putOutLn "Got a connection"
     client <- acceptTcp server
-    _      <- streamRead ac client $ \case
+    _      <- streamReadWrite ac client $ \case
       Done     => pure (Just ())
       Data val => bytesOut val >> write client val $> Nothing
       Err x    => throw x
@@ -139,6 +139,7 @@ parameters {auto l : UVLoop}
       Right srv => onConnection ac srv
 
     ignore $ onSignal SIGINT
+    putOutLn "Shutting down server..."
     cancel
 
 main : IO ()
