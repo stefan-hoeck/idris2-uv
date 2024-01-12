@@ -1,6 +1,5 @@
 module System.UV.Raw.Idle
 
-import Data.IORef
 import System.UV.Raw.Callback
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop

@@ -33,6 +33,7 @@ modules = IO.Async
         , System.UV.Util
         , System.UV.Work
 
+        , System.UV.Raw.Async
         , System.UV.Raw.Callback
         , System.UV.Raw.File
         , System.UV.Raw.Handle

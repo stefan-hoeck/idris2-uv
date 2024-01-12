@@ -6,10 +6,10 @@ import IO.Async.Token
 
 import Data.IORef
 import System
+import System.UV.Raw.Async
 import System.UV.Raw.Handle
 import System.UV.Raw.Loop
 import System.UV.Raw.Pointer
-import System.UV.Raw.Idle
 
 import public IO.Async
 import public System.UV.Data.Error
@@ -22,6 +22,7 @@ record UVLoop where
   [noHints]
   constructor MkLoop
   loop  : Ptr Loop
+  async : Ptr Async
   tg    : TokenGen
   cc    : CloseCB
   ref   : IORef (SnocList EvalST)
@@ -29,7 +30,12 @@ record UVLoop where
 
 export %inline %hint
 loopTokenGen : UVLoop => AsyncContext
-loopTokenGen @{l} = AC l.tg (\x => modifyIORef l.ref (:< x)) l.limit
+loopTokenGen @{l} =
+  AC
+    l.tg
+    (\x => modifyIORef l.ref (:< x))
+    (ignore (uv_async_send l.async))
+    l.limit
 
 export %inline %hint
 loopCloseCB : UVLoop => CloseCB
@@ -43,14 +49,13 @@ defaultLoop = do
   tg  <- newTokenGen
   ref <- newIORef {a = SnocList EvalST} [<]
   cc  <- defaultClose
+  pa  <- mallocPtr Async
 
-  let loop := MkLoop l tg cc ref 100
+  let loop := MkLoop l pa tg cc ref 100
 
-  pc  <- mallocPtr Idle
-  r1  <- uv_idle_init l pc
-  r2  <- uv_idle_start pc $ \x => do
+  r2  <- uv_async_init l pa $ \x => do
            readIORef ref >>= \case
-             [<] => ignore (uv_idle_stop x) >> uv_close x cc
+             [<] => uv_close x cc
              ss  => writeIORef ref [<] >> traverse_ eval (ss <>> [])
   pure loop
 

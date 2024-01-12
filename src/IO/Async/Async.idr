@@ -73,7 +73,7 @@ data Prim : List Type -> Type -> Type where
   -- out cancel state that can be used when spawning a new fiber.
   Self   : Prim es (MVar CancelState)
 
-  -- repeatedly poll the given `IO` action until int yields a `Just`
+  -- repeatedly poll the given `IO` action until it yields a `Just`
   Poll   : IO (Maybe $ Outcome es a) -> Prim es a
 
   -- cancel the current fiber
@@ -319,17 +319,6 @@ export %inline
 forever : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Async es a
 forever f = AP P $ CB f
 
-||| Repeatedly invokes the given `IO` action until it returns
-||| a `Just`.
-|||
-||| This will semantically block the current fiber.
-|||
-||| If you want to run this in the background without blocking,
-||| wrap it with `start`.
-export %inline
-poll : IO (Maybe $ Outcome es a) -> Async es a
-poll = AP P . Poll
-
 ||| Runs an asynchronous computation in the background on a new fiber.
 |||
 ||| The resulting fiber can be canceled from the current fiber, and
@@ -351,14 +340,14 @@ export
   liftIO $
     for_ f.parent (\p => removeChild p f.token) >>
     ignore (cancel f.canceled)
-  AB P (poll $ tryGet f.outcome) (\_ => succeed ())
+  AB P (AP P . Poll $ tryGet f.outcome) (\_ => succeed ())
 
 ||| Semantically blocks the current fiber until the target fiber
 ||| has produced a result, in which case we continue with that
 ||| result.
 export
 (.await) : Fiber es a -> Async es a
-(.await) f = poll $ tryGet f.outcome
+(.await) f = AP P . Poll $ tryGet f.outcome
 
 ||| Semantically blocks the current fiber until one
 ||| of the two given fibers has produced an outcome, in which
@@ -374,7 +363,7 @@ raceF x y = do
   fx <- x
   fy <- y
   finally
-    (cancelable $ poll $
+    (cancelable $ AP P . Poll $
        tryGet fx.outcome >>= \case
          Nothing => tryGet fy.outcome
          Just v  => pure (Just v)
@@ -434,6 +423,9 @@ record AsyncContext where
   ||| computations (fibers)
   submit   : EvalST -> IO ()
 
+  ||| Wake up the context:w
+  wakeup   : IO ()
+
   ||| Maximal number of iterations before we cede evaluation
   ||| to the next fiber.
   limit    : Nat
@@ -450,6 +442,7 @@ data PrimRes : (es : List Type) -> Type -> Type where
   Done : Bool -> Outcome es a -> PrimRes es a
 
 data EvalRes : (es : List Type) -> Type -> Type where
+  ECont : Bool -> Async es a -> Stack es fs a b -> EvalRes fs b
   ECede : Bool -> Async es a -> Stack es fs a b -> EvalRes fs b
   EDone : Bool -> Outcome es a -> EvalRes es a
 
@@ -470,18 +463,20 @@ set : Cancelability -> Async es a -> Async es a
 set x (AP y z)   = AP (x <+> y) z
 set x (AB y z f) = AB (x <+> y) z f
 
-runDeferred :
-     ((Outcome es (Maybe a) -> IO ()) -> IO ())
-  -> Deferred (Outcome es a)
-  -> IO ()
-runDeferred f x =
-  f $ \case
-    Succeeded (Just a) => ignore $ complete x (Succeeded a)
-    Succeeded Nothing  => pure ()
-    Canceled           => ignore $ complete x Canceled
-    Error err          => ignore $ complete x (Error err)
-
 parameters {auto ctxt : AsyncContext}
+
+  runDeferred :
+       ((Outcome es (Maybe a) -> IO ()) -> IO ())
+    -> Deferred (Outcome es a)
+    -> IO ()
+  runDeferred f x =
+    f $ \y => do
+      case y of
+        Succeeded (Just a) => ignore $ complete x (Succeeded a)
+        Succeeded Nothing  => pure ()
+        Canceled           => ignore $ complete x Canceled
+        Error err          => ignore $ complete x (Error err)
+      ctxt.wakeup
 
   prim :
        MVar CancelState
@@ -503,7 +498,8 @@ parameters {auto ctxt : AsyncContext}
   prim m b c (Start x) w =
     let MkIORes fbr w2 := toPrim (newFiber (Just m)) w
         MkIORes ()  w3 := toPrim (ctxt.submit (EST fbr x [])) w2
-     in MkIORes (Done b $ Succeeded fbr) w3
+        MkIORes ()  w4 := toPrim ctxt.wakeup w3
+     in MkIORes (Done b $ Succeeded fbr) w4
 
   prim m b c (Poll x)  w =
     let MkIORes Nothing w2 := toPrim x w
@@ -521,7 +517,7 @@ parameters {auto ctxt : AsyncContext}
     -> Async es a
     -> Stack es fs a b
     -> PrimIO (EvalRes fs b)
-  step 0     m b act stck w = MkIORes (ECede b act stck) w
+  step 0     m b act stck w = MkIORes (ECont b act stck) w
 
   step (S k) m b (AB c p f) stck w =
     step k m b (set c p) ((c,f)::stck) w
@@ -541,8 +537,12 @@ parameters {auto ctxt : AsyncContext}
     cs  <- readMVar f.canceled
     res <- primIO (step ctxt.limit f.canceled cs.canceled act stck)
     case res of
-      ECede b act' stck' => cancel b f >> ctxt.submit (EST f act' stck')
-      EDone b res        => cancel b f >> ignore (complete f.outcome res)
+      ECont b act' stck' =>
+        cancel b f >> ctxt.submit (EST f act' stck') >> ctxt.wakeup
+      ECede b act' stck' =>
+        cancel b f >> ctxt.submit (EST f act' stck')
+      EDone b res        =>
+        cancel b f >> ignore (complete f.outcome res) >> ctxt.wakeup
 
 --------------------------------------------------------------------------------
 -- Running asynchronous computations
@@ -557,7 +557,8 @@ childOnAsync :
   -> IO ()
 childOnAsync parent as cb = do
   fb <- newFiber parent
-  eval (EST fb (guarantee as (liftIO . cb)) [])
+  ctxt.submit (EST fb (guarantee as (liftIO . cb)) [])
+  ctxt.wakeup
 
 ||| Runs the given asynchronous computation to completion
 ||| invoking the given callback once it is done.
