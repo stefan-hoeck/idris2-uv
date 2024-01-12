@@ -6,6 +6,7 @@ import System.UV.File
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Stream
+import System.UV.Raw.Stream
 import System.UV.Util
 import System.UV.Raw.Handle
 import System.UV.Raw.Pipe
@@ -36,6 +37,7 @@ parameters {auto l : UVLoop}
 
   export covering
   streamStdin :
-       (ReadRes ByteString -> Async es (Maybe a))
+       AllocCB
+    -> (ReadRes ByteString -> Async es (Maybe a))
     -> Async es (Fiber es a)
-  streamStdin run = use1 stdinOpen $ \h => streamRead 0xffff h run
+  streamStdin ac run = use1 stdinOpen $ \h => streamRead ac h run

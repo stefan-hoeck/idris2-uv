@@ -63,7 +63,8 @@ data Prim : List Type -> Type -> Type where
   -- lifte `IO` action
   Sync   : IO (Outcome es a) -> Prim es a
 
-  -- registering function for a callback that running forever
+  -- registering function for a callback that's potentially
+  -- running forever
   CB     : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Prim es a
 
   -- spawn a new fiber with the given computation
@@ -442,8 +443,10 @@ doneType Canceled = "Canceled"
 
 -- debug string for outcomes
 resDebugMsg : EvalRes es a -> String
-resDebugMsg (Cede b x) = "Cede (\{show b}) of type \{type x} and depth \{show $ depth x}"
-resDebugMsg (Done b x) = "Done (\{show b}) of type \{doneType x}"
+resDebugMsg (Cede b x) =
+  "Cede (\{show b}) of type \{type x} and depth \{show $ depth x}"
+resDebugMsg (Done b x) =
+  "Done (\{show b}) of type \{doneType x}"
 
 set : Cancelability -> Async es a -> Async es a
 set x (AP y z)   = AP (x <+> y) z

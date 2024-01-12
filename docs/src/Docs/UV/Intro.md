@@ -451,7 +451,7 @@ echoExample = do
 
   -- allocating callbacks
   cc     <- defaultClose
-  ac     <- defaultAlloc
+  ac     <- sizedAlloc 0xffff
 
   -- binding the server to local address 0.0.0.0 at port 7000
   addr   <- mallocPtr SockAddrIn
@@ -514,8 +514,8 @@ echoRead cc client nread pbuf =
        when (fromCode nread /= EOF) $ do
          putStrLn "Read error \{errorMsg $ fromCode nread}"
 
--- main : IO ()
--- main = echoExample
+main : IO ()
+main = echoExample
 ```
 
 If we got some data, we typically process it and send a response to
@@ -575,7 +575,7 @@ clientExample = do
 
   -- allocating callbacks
   cc     <- defaultClose
-  ac     <- defaultAlloc
+  ac     <- sizedAlloc 0xffff
 
   -- binding the server to local address 0.0.0.0 at port 7000
   addr   <- mallocPtr SockAddrIn
@@ -590,8 +590,8 @@ clientExample = do
 
   freePtr addr
 
-main : IO ()
-main = clientExample
+-- main : IO ()
+-- main = clientExample
 ```
 
 And while the above example might now (hopefully) be pretty clear, it's

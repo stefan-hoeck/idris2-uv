@@ -36,15 +36,24 @@ parameters {auto l : UVLoop}
 
   export covering
   streamRead :
-       (buffer : Bits32)
+       AllocCB
     -> Ptr t
     -> {auto 0 cstt : PCast t Stream}
     -> (ReadRes ByteString -> Async es (Maybe a))
     -> Async es (Fiber es a)
-  streamRead buffer h run = do
-    use1 (sizedAlloc buffer) $ \ac =>
-      uvForever run h (\x => uv_read_stop x) $ \cb =>
-        uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
+  streamRead ac h run = do
+    uvForever run h (\x => uv_read_stop x) $ \cb =>
+      uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
+
+  export covering
+  write :
+       Ptr t
+    -> {auto 0 cstt : PCast t Stream}
+    -> ByteString
+    -> Async es ()
+  write str b =
+    use1 (fromByteString b) $ \cs =>
+      uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
 
   export covering
   listen :
