@@ -26,7 +26,7 @@ parameters {auto l   : UVLoop}
   ||| Note: If used in a do-block this will semantically block the
   |||       current fiber.
   |||       Wrap this in `start` to run it in the background.
-  export covering
+  export
   onSignal : SigCode -> Async es SigCode
   onSignal c = do
     ps <- mkSignal

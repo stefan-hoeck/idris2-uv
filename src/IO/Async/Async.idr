@@ -379,26 +379,12 @@ raceEither x y = race (map Left x) (map Right y)
 -- Evaluation
 --------------------------------------------------------------------------------
 
-data View : List Type -> Type -> Type where
-  VP : Cancelability -> Prim es a -> View es a
-  VB :
-       Cancelability
-    -> Prim es a
-    -> Cancelability
-    -> (Outcome es a -> Async fs b)
-    -> View fs b
-
-fromView : View es a -> Async es a
-fromView (VP x y)     = AP x y
-fromView (VB x y z f) = AB z (AP x y) f
-
-covering
-toView : Async es a -> View es a
-toView (AP c  y)   = VP c y
-toView (AB cp y f) =
-  case y of
-    AP cc p   => VB (cp <+> cc) p cp f
-    AB cc z g => toView $ AB (cp <+> cc) z (\x => AB cp (g x) f)
+data Stack : (es,fs : List Type) -> (a,b : Type) -> Type where
+  Nil  : Stack es es a a
+  (::) :
+       (Cancelability, (Outcome es a -> Async fs b))
+    -> Stack fs gs b c
+    -> Stack es gs a c
 
 ||| Intermediary state of a running asynchronous computation
 ||| concisting of the fiber it is running on and the current
@@ -406,10 +392,11 @@ toView (AB cp y f) =
 export
 record EvalST where
   constructor EST
-  {0 errors : List Type}
-  {0 result : Type}
-  fiber     : Fiber errors result
-  act       : Async errors result
+  {0 ers1,ers2 : List Type}
+  {0 res1,res2 : Type}
+  fiber        : Fiber ers2 res2
+  act          : Async ers1 res1
+  stack        : Stack ers1 ers2 res1 res2
 
 ||| Context for running asynchronous computations.
 |||
@@ -421,8 +408,16 @@ public export
 record AsyncContext where
   [noHints]
   constructor AC
+  ||| Generator for unique fiber tokens
   tokenGen : TokenGen
+
+  ||| Function to submit and start new asynchronous
+  ||| computations (fibers)
   submit   : EvalST -> IO ()
+
+  ||| Maximal number of iterations before we cede evaluation
+  ||| to the next fiber.
+  limit    : Nat
 
 export %inline %hint
 contextToTokenGen : AsyncContext => TokenGen
@@ -431,9 +426,13 @@ contextToTokenGen @{c} = c.tokenGen
 -- result of a single step of evaluation.
 -- boolean values indicate whether the current fiber has
 -- been canceled before or during the evaluation.
+data PrimRes : (es : List Type) -> Type -> Type where
+  Cede : Bool -> Async es a -> PrimRes es a
+  Done : Bool -> Outcome es a -> PrimRes es a
+
 data EvalRes : (es : List Type) -> Type -> Type where
-  Cede : Bool -> Async es a -> EvalRes es a
-  Done : Bool -> Outcome es a -> EvalRes es a
+  ECede : Bool -> Async es a -> Stack es fs a b -> EvalRes fs b
+  EDone : Bool -> Outcome es a -> EvalRes es a
 
 -- debug string for outcomes
 doneType : Outcome es a -> String
@@ -442,7 +441,7 @@ doneType (Error err) = "Error"
 doneType Canceled = "Canceled"
 
 -- debug string for outcomes
-resDebugMsg : EvalRes es a -> String
+resDebugMsg : PrimRes es a -> String
 resDebugMsg (Cede b x) =
   "Cede (\{show b}) of type \{type x} and depth \{show $ depth x}"
 resDebugMsg (Done b x) =
@@ -452,6 +451,17 @@ set : Cancelability -> Async es a -> Async es a
 set x (AP y z)   = AP (x <+> y) z
 set x (AB y z f) = AB (x <+> y) z f
 
+runDeferred :
+     ((Outcome es (Maybe a) -> IO ()) -> IO ())
+  -> Deferred (Outcome es a)
+  -> IO ()
+runDeferred f x =
+  f $ \case
+    Succeeded (Just a) => ignore $ complete x (Succeeded a)
+    Succeeded Nothing  => pure ()
+    Canceled           => ignore $ complete x Canceled
+    Error err          => ignore $ complete x (Error err)
+
 parameters {auto ctxt : AsyncContext}
 
   prim :
@@ -459,54 +469,59 @@ parameters {auto ctxt : AsyncContext}
     -> Bool
     -> Cancelability
     -> Prim es a
-    -> IO (EvalRes es a)
-  prim m True C _ = pure (Done True Canceled)
+    -> PrimIO (PrimRes es a)
+  prim m True C _ w = MkIORes (Done True Canceled) w
 
-  prim m b c (Sync x) = Done b <$> x
+  prim m b c (Sync x) w =
+    let MkIORes v w2 := toPrim x w
+     in MkIORes (Done b v) w2
 
-  prim m b c (CB f) = do
-    x <- newDeferred
-    f $ \case
-      Succeeded (Just a) => ignore $ complete x (Succeeded a)
-      Succeeded Nothing  => pure ()
-      Canceled           => ignore $ complete x Canceled
-      Error err          => ignore $ complete x (Error err)
-    pure (Cede b . AP c . Poll $ clearGet x)
+  prim m b c (CB f) w =
+    let MkIORes def w2 := toPrim newDeferred w
+        MkIORes ()  w3 := toPrim (runDeferred f def) w2
+     in MkIORes (Cede b . AP c . Poll $ tryGet def) w3
 
-  prim m b c (Start x) = do
-    fbr <- newFiber (Just m)
-    ctxt.submit (EST fbr x)
-    pure (Done b $ Succeeded fbr)
+  prim m b c (Start x) w =
+    let MkIORes fbr w2 := toPrim (newFiber (Just m)) w
+        MkIORes ()  w3 := toPrim (ctxt.submit (EST fbr x [])) w2
+     in MkIORes (Done b $ Succeeded fbr) w3
 
-  prim m b c (Poll x)  = do
-    Nothing <- x | Just v => pure (Done b v)
-    pure (Cede b . AP c $ Poll x)
+  prim m b c (Poll x)  w =
+    let MkIORes Nothing w2 := toPrim x w
+          | MkIORes (Just v) w2 => MkIORes (Done b v) w2
+     in MkIORes (Cede b . AP c $ Poll x) w2
 
-  prim m b c Cancel = pure (Done True Canceled)
+  prim m b c Cancel w = MkIORes (Done True Canceled) w
 
-  covering
   step :
-       MVar CancelState
+       Nat
+    -> MVar CancelState
     -> Bool
-    -> View es a
-    -> PrimIO (EvalRes es a)
-  step m b (VP c p)     w = toPrim (prim m b c p) w
-  step m b (VB c p x f) w =
-    let MkIORes o w2 := toPrim (prim m b c p) w
-     in case o of
-          Done b2 z => case cancelNow b2 x of
-            True  => MkIORes (Done True Canceled) w2
-            False => step m b2 (toView . set x $ f z) w2
-          Cede b2 z => MkIORes (Cede b2 $ AB x z f) w2
+    -> Async es a
+    -> Stack es fs a b
+    -> PrimIO (EvalRes fs b)
+  step 0     m b act stck w = MkIORes (ECede b act stck) w
 
-  export covering
+  step (S k) m b (AB c p f) stck w =
+    step k m b (set c p) ((c,f)::stck) w
+
+  step (S k) m b (AP c p) stck w =
+    let MkIORes (Done b2 o) w2 := prim m b c p w
+          | MkIORes (Cede b2 v) w2 => MkIORes (ECede b2 v stck) w2
+     in case stck of
+          []       => MkIORes (EDone b2 o) w2
+          (d,f)::t => case cancelNow b2 d of
+            True  => MkIORes (EDone b2 Canceled) w2
+            False => step k m b2 (set c $ f o) t w2
+
+  export
   eval : EvalST -> IO ()
-  eval (EST f act) = do
+  eval (EST f act stck) = do
     cs  <- readMVar f.canceled
-    res <- primIO (step f.canceled cs.canceled (toView $ set C act))
+    res <- primIO (step ctxt.limit f.canceled cs.canceled act stck)
     case res of
-      Cede b act' => cancel b f >> ctxt.submit (EST f act')
-      Done b res  => cancel b f >> ignore (complete f.outcome res)
+      ECede b act' stck' => cancel b f >> ctxt.submit (EST f act' stck')
+      EDone b res        => cancel b f >> ignore (complete f.outcome res)
 
 --------------------------------------------------------------------------------
 -- Running asynchronous computations
@@ -514,13 +529,13 @@ parameters {auto ctxt : AsyncContext}
 
 ||| Runs the given asynchronous computation to completion
 ||| invoking the given callback once it is done.
-export covering
+export
 onAsync : AsyncContext => Async es a -> (Outcome es a -> IO ()) -> IO ()
 onAsync as cb = do
   fb  <- newFiber Nothing
-  eval (EST fb $ guarantee as (liftIO . cb))
+  eval (EST fb (guarantee as (liftIO . cb)) [])
 
 ||| Asynchronously runs the given computation to completion.
-export covering %inline
+export %inline
 runAsync : AsyncContext => Async [] () -> IO ()
 runAsync as = onAsync as (\_ => pure ())

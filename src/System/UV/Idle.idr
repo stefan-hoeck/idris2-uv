@@ -38,7 +38,7 @@ parameters {auto l   : UVLoop}
   mkIdle = mallocPtr Idle >>= uvAct (uv_idle_init l.loop)
 
   ||| Runs the given `IO` action during the "idle" phase of the event loop.
-  export covering
+  export
   onIdle : Async es (Maybe a) -> Async es (Fiber es a)
   onIdle as = do
     pi <- mkIdle
@@ -49,7 +49,7 @@ parameters {auto l   : UVLoop}
   mkCheck = mallocPtr Check >>= uvAct (uv_check_init l.loop)
 
   ||| Runs the given `IO` action during the "check" phase of the event loop.
-  export covering
+  export
   onCheck : Async es (Maybe a) -> Async es (Fiber es a)
   onCheck as = do
     pi <- mkCheck
@@ -60,7 +60,7 @@ parameters {auto l   : UVLoop}
   mkPrepare = mallocPtr Prepare >>= uvAct (uv_prepare_init l.loop)
 
   ||| Runs the given `IO` action during the "prepare" phase of the event loop.
-  export covering
+  export
   onPrepare : Async es (Maybe a) -> Async es (Fiber es a)
   onPrepare as = do
     pi <- mkPrepare

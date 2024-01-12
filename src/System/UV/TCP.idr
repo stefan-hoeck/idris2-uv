@@ -63,7 +63,7 @@ parameters {auto l : UVLoop}
   acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
   acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
 
-  export covering
+  export
   listenTcp :
        (addresss : String)
     -> (port     : Bits16)

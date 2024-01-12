@@ -21,21 +21,22 @@ public export
 record UVLoop where
   [noHints]
   constructor MkLoop
-  loop : Ptr Loop
-  tg   : TokenGen
-  cc   : CloseCB
-  ref  : IORef (SnocList EvalST)
+  loop  : Ptr Loop
+  tg    : TokenGen
+  cc    : CloseCB
+  ref   : IORef (SnocList EvalST)
+  limit : Nat
 
 export %inline %hint
 loopTokenGen : UVLoop => AsyncContext
-loopTokenGen @{l} = AC l.tg (\x => modifyIORef l.ref (:< x))
+loopTokenGen @{l} = AC l.tg (\x => modifyIORef l.ref (:< x)) l.limit
 
 export %inline %hint
 loopCloseCB : UVLoop => CloseCB
 loopCloseCB @{l} = l.cc
 
 ||| Returns the default loop, corresponding to `uv_default_loop`.
-export covering
+export
 defaultLoop : IO UVLoop
 defaultLoop = do
   l   <- uv_default_loop
@@ -43,7 +44,7 @@ defaultLoop = do
   ref <- newIORef {a = SnocList EvalST} [<]
   cc  <- defaultClose
 
-  let loop := MkLoop l tg cc ref
+  let loop := MkLoop l tg cc ref 100
 
   pc  <- mallocPtr Idle
   r1  <- uv_idle_init l pc
@@ -87,7 +88,7 @@ parameters {auto has : Has UVError es}
            )
       (close p)
 
-  export covering
+  export
   uvOnce' :
        (ptr : r)
     -> (close : r -> Async [] ())
@@ -98,7 +99,7 @@ parameters {auto has : Has UVError es}
 parameters {auto has : Has UVError es}
            {auto l   : UVLoop}
 
-  export covering
+  export
   uvForever :
        (a -> Async es (Maybe b))
     -> (ptr : r)
@@ -115,7 +116,7 @@ parameters {auto has : Has UVError es}
            )
       (close p)
 
-  export covering
+  export
   uvForever' :
        Async es (Maybe b)
     -> (ptr : r)

@@ -178,7 +178,7 @@ parameters {auto l   : UVLoop}
   readStdIn : Async es ByteString
   readStdIn = readBytes stdin 4096
 
-  export covering
+  export
   readFile : (path : String) -> Bits32 -> Async es ByteString
   readFile path n = use1 (fsOpen path RDONLY 0) (`readBytes` n)
 

@@ -28,7 +28,7 @@ parameters {auto l   : UVLoop}
 
   ||| Sends a signal every `repeat` milliseconds, the first time
   ||| after `timeout` has passed.
-  export covering
+  export
   repeatedly :
        (timeout,repeat : Bits64)
     -> Async es (Maybe a)
@@ -38,7 +38,7 @@ parameters {auto l   : UVLoop}
     uvForever' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t r
 
   ||| Sends a signal after `timeout` milliseconds have passed.
-  export covering
+  export
   once : (timeout : Bits64) -> Async es ()
   once t = do
     pt <- mkTimer

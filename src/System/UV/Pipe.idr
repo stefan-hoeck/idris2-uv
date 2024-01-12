@@ -35,7 +35,7 @@ parameters {auto l : UVLoop}
   stdinOpen : Async es (Ptr Pipe)
   stdinOpen = pipeOpen stdin
 
-  export covering
+  export
   streamStdin :
        AllocCB
     -> (ReadRes ByteString -> Async es (Maybe a))
