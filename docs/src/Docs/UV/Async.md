@@ -66,11 +66,11 @@ parameters {auto l : UVLoop}
     putStrLn "Starting the counter"
     counter <- onIdle (checkCounter ref)
 
-    res     <- raceEither (onSignal SIGINT) (once 5000)
+    res     <- raceAny [onSignal SIGINT, once 5000]
 
     case res of
-      Left sig => putOutLn "Counter interrupted by \{show sig}"
-      Right () => putOutLn "Counter interrupted by timeout"
+      Here sig => putOutLn "Counter interrupted by \{show sig}"
+      _        => putOutLn "Counter interrupted by timeout"
 
     putOutLn "Cancelling counter"
     cancel
@@ -110,13 +110,19 @@ parameters {auto l : UVLoop}
   fileStreamExample = do
     (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
     v <- use1 (fsOpen "out" (WRONLY <+> CREAT) 0o644) $ \f =>
-           raceEither (onSignal SIGINT) (streamFile p 0xffff $ writeBytes f)
-    case v of
-      Left s  => putOutLn "Stream interrupted by \{show s}"
-      Right _ => putOutLn "Stream exhausted."
+           raceAny
+             [ onSignal SIGINT
+             , once 10000
+             , streamFile p 0xffff $ writeBytes f
+             ]
 
--- main : IO ()
--- main = runDoc fileStreamExample
+    case v of
+      Here s         => putOutLn "Stream interrupted by \{show s}"
+      There (Here _) => putOutLn "Stream interrupted by timeout"
+      _              => putOutLn "Stream exhausted."
+
+main : IO ()
+main = runDoc fileStreamExample
 ```
 
 ## An echo Server
@@ -144,8 +150,8 @@ parameters {auto l : UVLoop}
     putOutLn "Shutting down server..."
     cancel
 
-main : IO ()
-main = runDoc echo
+-- main : IO ()
+-- main = runDoc echo
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown

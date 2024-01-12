@@ -350,34 +350,41 @@ export
 (.await) f = AP P . Poll $ tryGet f.outcome
 
 ||| Semantically blocks the current fiber until one
-||| of the two given fibers has produced an outcome, in which
-||| case the second fiber is canceled immediately.
+||| of the given fibers has produced an outcome, in which
+||| the others are canceled immediately.
 |||
 ||| This is useful if you for instance have several abort conditions
 ||| such as a timer and a signal from the operating system, and want
-||| to stop your process as soon as the first of the two conditions
+||| to stop your process as soon as the first of the conditions
 ||| occurs.
 export
-raceF : (x,y : Async es (Fiber es a)) -> Async es a
-raceF x y = do
-  fx <- x
-  fy <- y
+raceF : List (Async es (Fiber es a)) -> Async es a
+raceF fs = do
+  fibers <- sequence fs
   finally
-    (cancelable $ AP P . Poll $
-       tryGet fx.outcome >>= \case
-         Nothing => tryGet fy.outcome
-         Just v  => pure (Just v)
-    ) (dropErrs $ fx.cancel >> fy.cancel)
+    (AP P . Poll $ pollAll fibers)
+    (dropErrs $ traverse_ (.cancel) fibers)
+  where
+    pollAll : List (Fiber es a) -> IO (Maybe $ Outcome es a)
+    pollAll []        = pure Nothing
+    pollAll (x :: xs) = do
+      Nothing <- tryGet x.outcome | Just v => pure (Just v)
+      pollAll xs
 
-||| Alias for `raceF (start x) (start y)`.
+
+||| Alias for `raceF . traverse start`.
 export %inline
-race : (x,y : Async es a) -> Async es a
-race x y = raceF (start x) (start y)
+race : (xs : List $ Async es a) -> Async es a
+race = raceF . map start
+
+injections : All f ts -> All (\t => (v : t) -> HSum ts) ts
+injections []        = []
+injections (x :: xs) = Here :: mapProperty (There .) (injections xs)
 
 ||| Alias for `race (map Left x) (map Right y)`
 export %inline
-raceEither : (x : Async es a) -> (y : Async es b) -> Async es (Either a b)
-raceEither x y = race (map Left x) (map Right y)
+raceAny : All (Async es) ts -> Async es (HSum ts)
+raceAny xs = race . forget $ hzipWith map (injections xs) xs
 
 export %inline
 self : Async es (MVar CancelState)
