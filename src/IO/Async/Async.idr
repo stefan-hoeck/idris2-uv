@@ -396,6 +396,8 @@ collectOutcomes (Canceled    :: t) =
     Error x => Error x
     _       => Canceled
 
+||| Accumulates the results of the given heterogeneous list of
+||| fibers in a heterogeneous list.
 export
 parF : All (Async es . Fiber es) ts -> Async es (HList ts)
 parF fs = do
@@ -407,6 +409,12 @@ parF fs = do
         map (map collectOutcomes . hsequence)
       . hsequence
       . mapProperty (tryGet . outcome)
+
+||| Runs the given computations in parallel and collects the outcomes
+||| in a heterogeneous list.
+export %inline
+par : All (Async es) ts -> Async es (HList ts)
+par = parF . mapProperty start
 
 export %inline
 self : Async es (MVar CancelState)
