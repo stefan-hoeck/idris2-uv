@@ -381,10 +381,32 @@ injections : All f ts -> All (\t => (v : t) -> HSum ts) ts
 injections []        = []
 injections (x :: xs) = Here :: mapProperty (There .) (injections xs)
 
-||| Alias for `race (map Left x) (map Right y)`
+||| Runs a heterogeneous list of asynchronous computations in parallel,
+||| keeping only the one that finishes first.
 export %inline
 raceAny : All (Async es) ts -> Async es (HSum ts)
 raceAny xs = race . forget $ hzipWith map (injections xs) xs
+
+collectOutcomes : All (Outcome es) ts -> Outcome es (HList ts)
+collectOutcomes []                 = Succeeded []
+collectOutcomes (Succeeded r :: t) = (r::) <$> collectOutcomes t
+collectOutcomes (Error x     :: t) = Error x
+collectOutcomes (Canceled    :: t) =
+  case collectOutcomes t of
+    Error x => Error x
+    _       => Canceled
+
+export
+parF : All (Async es . Fiber es) ts -> Async es (HList ts)
+parF fs = do
+  fibers <- hsequence fs
+  AP P . Poll $ pollAll fibers
+  where
+    pollAll : All (Fiber es) ss -> IO (Maybe $ Outcome es (HList ss))
+    pollAll =
+        map (map collectOutcomes . hsequence)
+      . hsequence
+      . mapProperty (tryGet . outcome)
 
 export %inline
 self : Async es (MVar CancelState)
