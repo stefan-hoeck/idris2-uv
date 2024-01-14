@@ -1,6 +1,7 @@
 module System.UV.Pointer
 
 import IO.Async
+import Data.Buffer
 import Data.Buffer.Indexed
 import Data.ByteString
 import System.FFI
@@ -45,7 +46,7 @@ toString p s = toString <$> toByteString p s
 export
 fromByteString : HasIO io => ByteString -> io (Ptr Bits8)
 fromByteString (BS s (BV b o _)) =
-  copyFromBuffer (unsafeToBuffer b) (cast s) (cast o)
+  copyFromBuffer (unsafeGetBuffer b) (cast s) (cast o)
 
 ||| Allocates a byte array to hold the data in the given bytestring.
 export %inline

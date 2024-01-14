@@ -19,8 +19,14 @@ type = "local"
 path = "docs"
 ipkg = "uv-docs.ipkg"
 
+[custom.all.array]
+type   = "git"
+url    = "https://github.com/stefan-hoeck/idris2-array"
+commit = "latest:buffer"
+ipkg   = "array.ipkg"
+
 [custom.all.bytestring]
 type   = "git"
 url    = "https://github.com/stefan-hoeck/idris2-bytestring"
-commit = "latest:main"
+commit = "latest:buffer"
 ipkg   = "bytestring.ipkg"
