@@ -32,7 +32,7 @@ parameters {auto l   : UVLoop}
   repeatedly :
        (timeout,repeat : Bits64)
     -> Async es (Maybe a)
-    -> Async es (Fiber es a)
+    -> Async es a
   repeatedly t r run = do
     pt <- mkTimer
     uvForever' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t r

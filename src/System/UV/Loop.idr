@@ -110,9 +110,9 @@ parameters {auto has : Has UVError es}
     -> (ptr : r)
     -> (close : r -> Async [] ())
     -> ((a -> IO ()) -> IO Int32)
-    -> Async es (Fiber es b)
+    -> Async es b
   uvForever to p close reg =
-    start $ finally
+    finally
       (do
         cc <- self
         forever $ \cb => do
@@ -129,7 +129,7 @@ parameters {auto has : Has UVError es}
     -> (ptr : r)
     -> (close : r -> Async [] ())
     -> (IO () -> IO Int32)
-    -> Async es (Fiber es b)
+    -> Async es b
   uvForever' as p close reg = uvForever (const as) p close (\f => reg (f ()))
 
   export

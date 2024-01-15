@@ -39,5 +39,5 @@ parameters {auto l : UVLoop}
   streamStdin :
        AllocCB
     -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es (Fiber es a)
+    -> Async es a
   streamStdin ac run = use1 stdinOpen $ \h => streamRead ac h run

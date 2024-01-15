@@ -45,7 +45,7 @@ parameters {auto l : UVLoop}
     -> Ptr t
     -> {auto 0 cstt : PCast t Stream}
     -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es (Fiber es a)
+    -> Async es a
   streamRead ac h run = do
     uvForever run h (\x => uv_read_stop x) $ \cb =>
       uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
@@ -56,7 +56,7 @@ parameters {auto l : UVLoop}
     -> Ptr t
     -> {auto 0 cstt : PCast t Stream}
     -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es (Fiber es a)
+    -> Async es a
   streamReadWrite ac h run = do
     uvForever run h (close_stream . castPtr) $ \cb =>
       uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
@@ -76,7 +76,7 @@ parameters {auto l : UVLoop}
        Ptr t
     -> {auto 0 cst : PCast t Stream}
     -> (Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es (Fiber es a)
+    -> Async es a
   listen {cst} server run =
     uvForever run server (release . castPtr @{cst}) $ \cb =>
       uv_listen server 128 $ \p,res =>
