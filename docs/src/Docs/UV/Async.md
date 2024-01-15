@@ -64,7 +64,7 @@ parameters {auto l : UVLoop}
     putStrLn "Hello World"
     ref     <- newIORef 0
     putStrLn "Starting the counter"
-    counter <- onIdle (checkCounter ref)
+    counter <- start $ onIdle (checkCounter ref)
 
     res     <- raceAny [onSignal SIGINT, once 5000]
 
@@ -129,8 +129,8 @@ parameters {auto l : UVLoop}
       There (Here _) => putOutLn "Stream interrupted by timeout"
       _              => putOutLn "Stream exhausted."
 
-main : IO ()
-main = runDoc fileStreamExample
+-- main : IO ()
+-- main = runDoc fileStreamExample
 ```
 
 ## An echo Server
@@ -146,7 +146,7 @@ parameters {auto l : UVLoop}
   onConnection ac server = do
     putOutLn "Got a connection"
     client <- acceptTcp server
-    _      <- streamReadWrite ac client $ \case
+    _      <- start $ streamReadWrite ac client $ \case
       Done     => pure (Just ())
       Data val => write client val $> Nothing
       Err x    => throw x
@@ -155,7 +155,7 @@ parameters {auto l : UVLoop}
   echo : DocIO ()
   echo = do
     ac <- sizedAlloc 0xffff
-    server <- listenTcp "0.0.0.0" 7000 $ \case
+    server <- start $ listenTcp "0.0.0.0" 7000 $ \case
       Left err  => putErrLn "Error when receiving request: \{err}" $> Nothing
       Right srv => onConnection ac srv
 
@@ -163,8 +163,8 @@ parameters {auto l : UVLoop}
     putOutLn "Shutting down server..."
     cancel
 
--- main : IO ()
--- main = runDoc echo
+main : IO ()
+main = runDoc echo
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown

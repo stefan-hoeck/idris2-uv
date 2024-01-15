@@ -39,7 +39,7 @@ parameters {auto l   : UVLoop}
 
   ||| Runs the given `IO` action during the "idle" phase of the event loop.
   export
-  onIdle : Async es (Maybe a) -> Async es (Fiber es a)
+  onIdle : Async es (Maybe a) -> Async es a
   onIdle as = do
     pi <- mkIdle
     uvForever' as pi idle_stop (uv_idle_start pi . const)
@@ -50,7 +50,7 @@ parameters {auto l   : UVLoop}
 
   ||| Runs the given `IO` action during the "check" phase of the event loop.
   export
-  onCheck : Async es (Maybe a) -> Async es (Fiber es a)
+  onCheck : Async es (Maybe a) -> Async es a
   onCheck as = do
     pi <- mkCheck
     uvForever' as pi check_stop (uv_check_start pi . const)
@@ -61,7 +61,7 @@ parameters {auto l   : UVLoop}
 
   ||| Runs the given `IO` action during the "prepare" phase of the event loop.
   export
-  onPrepare : Async es (Maybe a) -> Async es (Fiber es a)
+  onPrepare : Async es (Maybe a) -> Async es a
   onPrepare as = do
     pi <- mkPrepare
     uvForever' as pi prepare_stop (uv_prepare_start pi . const)

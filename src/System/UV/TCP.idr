@@ -68,7 +68,7 @@ parameters {auto l : UVLoop}
        (addresss : String)
     -> (port     : Bits16)
     -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es (Fiber es a)
+    -> Async es a
   listenTcp address port run =
     use1 (mallocPtr SockAddrIn) $ \addr => do
       uv (uv_ip4_addr address port addr)
