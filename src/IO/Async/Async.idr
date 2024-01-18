@@ -247,6 +247,14 @@ bracket acquire use release =
 --------------------------------------------------------------------------------
 
 export %inline
+poll : IO (Maybe $ Outcome es a) -> Async es a
+poll = Poll
+
+export %inline
+cancelablePoll : IO (Maybe $ Outcome es a) -> Async [] () -> Async es a
+cancelablePoll = PollC
+
+export %inline
 executionContext : Async es ExecutionContext
 executionContext = Ctxt
 

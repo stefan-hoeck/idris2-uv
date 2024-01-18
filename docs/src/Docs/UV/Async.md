@@ -10,6 +10,7 @@ We start with some imports and type aliases:
 module Docs.UV.Async
 
 import Data.IORef
+import IO.Async.MVar
 import System
 import System.File
 import System.UV
@@ -50,36 +51,24 @@ after five seconds, whichever comes first.
 Here's the code:
 
 ```idris
--- parameters {auto l : UVLoop}
---
---   checkCounter : IORef Integer -> DocIO (Maybe ())
---   checkCounter ref = do
---     modifyIORef ref (+1)
---     v <- readIORef ref
---     when (v `mod` 10000 == 0) (putOutLn "Counter is at \{show v}")
---     pure Nothing
---
---   idleExample : DocIO ()
---   idleExample = do
---     putStrLn "Hello World"
---     ref     <- newIORef 0
---     putStrLn "Starting the counter"
---     counter <- start $ onIdle (checkCounter ref)
---
---     res     <- raceAny [onSignal SIGINT, once 5000]
---
---     case res of
---       Here sig => putOutLn "Counter interrupted by \{show sig}"
---       _        => putOutLn "Counter interrupted by timeout"
---
---     putOutLn "Cancelling counter"
---     cancel
+parameters {auto l : UVLoop}
+  timerExample : DocIO ()
+  timerExample = repeatedly 0 10 (go 50)
 
--- main : IO ()
--- main = runDoc $ do
---   putStrLn "Going to sleep"
---   race [sleep 2000, sleep 3100, sleep 500, ignore $ onSignal SIGINT]
---   putOutLn "Good morning"
+    where
+      go : Nat -> MVar Nat -> DocIO ()
+      go 0     m = pure ()
+      go (S k) m = do
+        n <- poll (Just . Succeeded <$> readMVar m)
+        putOutLn "At \{show $ S k}: Got \{show n} ticks"
+        sleep 100
+        go k m
+
+main : IO ()
+main = runDoc $ do
+  putStrLn "Going to sleep"
+  race [timerExample, ignore $ onSignal SIGINT]
+  putOutLn "Good morning"
 ```
 
 First, we note that `Async` comes with an implementation of `MonadIO`,
@@ -132,8 +121,8 @@ parameters {auto l : UVLoop}
       There (Here _) => putOutLn "Stream interrupted by timeout"
       _              => putOutLn "Stream exhausted."
 
-main : IO ()
-main = runDoc fileStreamExample
+-- main : IO ()
+-- main = runDoc fileStreamExample
 ```
 
 ## An echo Server

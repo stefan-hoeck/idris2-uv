@@ -5,6 +5,7 @@
 ||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
+import IO.Async.MVar
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Handle
@@ -15,7 +16,7 @@ import System.UV.Raw.Timer
 parameters {auto cc : CloseCB}
   export %inline
   Resource (Ptr Timer) where
-    release h = putStrLn "Releasing timer" >> uv_close h cc
+    release h = ignore (uv_timer_stop h) >> uv_close h cc
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
@@ -23,16 +24,19 @@ parameters {auto l   : UVLoop}
   mkTimer : Async es (Ptr Timer)
   mkTimer = mallocPtr Timer >>= uvAct (uv_timer_init l.loop)
 
-  -- ||| Sends a signal every `repeat` milliseconds, the first time
-  -- ||| after `timeout` has passed.
-  -- export
-  -- repeatedly :
-  --      (timeout,repeat : Bits64)
-  --   -> Async es (Maybe a)
-  --   -> Async es a
-  -- repeatedly t r run = do
-  --   pt <- mkTimer
-  --   uvForever' run pt timer_stop $ \cb => uv_timer_start pt (\_ => cb) t r
+  ||| Sends a signal every `repeat` milliseconds, the first time
+  ||| after `timeout` has passed.
+  export
+  repeatedly :
+       (timeout,repeat : Bits64)
+    -> (MVar Nat -> Async es a)
+    -> Async es a
+  repeatedly t r run =
+    use1 mkTimer $ \pt => do
+      ec <- executionContext
+      mv <- liftIO $ newMVar Z
+      uv $ uv_timer_start pt (\_ => modifyMVar mv S >> ec.wakeup) t r
+      run mv
 
   ||| Sends a signal after `timeout` milliseconds have passed.
   export

@@ -10,7 +10,7 @@ import public System.UV.Raw.Signal
 parameters {auto cc : CloseCB}
   export
   Resource (Ptr Signal) where
-    release h = putStrLn "Releasing signal" >> uv_close h cc
+    release h = uv_close h cc
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
