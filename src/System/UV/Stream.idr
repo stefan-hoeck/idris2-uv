@@ -39,27 +39,15 @@ parameters {auto l : UVLoop}
     uv_read_stop x
     ignore (uv_shutdown x $ \_,_ => uv_close x %search)
 
-  export
-  streamRead :
-       AllocCB
-    -> Ptr t
-    -> {auto 0 cstt : PCast t Stream}
-    -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es a
-  streamRead ac h run = do
-    uvForever run h (\x => uv_read_stop x) $ \cb =>
-      uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
-
-  export
-  streamReadWrite :
-       AllocCB
-    -> Ptr t
-    -> {auto 0 cstt : PCast t Stream}
-    -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es a
-  streamReadWrite ac h run = do
-    uvForever run h (close_stream . castPtr) $ \cb =>
-      uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
+  -- export
+  -- read :
+  --      AllocCB
+  --   -> Ptr t
+  --   -> {auto 0 cstt : PCast t Stream}
+  --   -> Async es (ReadRes ByteString)
+  -- read ac h = do
+  --   uvOnce h (\_ => pure ()) $ \cb =>
+  --     uv_read_start h ac (\p,n,buf => uv_read_stop p >> toMsg n buf >>= cb)
 
   export
   write :
@@ -71,13 +59,12 @@ parameters {auto l : UVLoop}
     use1 (fromByteString b) $ \cs =>
       uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
 
-  export
-  listen :
-       Ptr t
-    -> {auto 0 cst : PCast t Stream}
-    -> (Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es a
-  listen {cst} server run =
-    uvForever run server (release . castPtr @{cst}) $ \cb =>
-      uv_listen server 128 $ \p,res =>
-        cb $ if res < 0 then Left $ fromCode res else Right p
+  -- export
+  -- listen :
+  --      Ptr t
+  --   -> {auto 0 cst : PCast t Stream}
+  --   -> Async es (Either UVError $ Ptr Stream)
+  -- listen {cst} server =
+  --   uvOnce server (\_ => pure ()) $ \cb =>
+  --     uv_listen server 128 $ \p,res =>
+  --       cb $ if res < 0 then Left $ fromCode res else Right p

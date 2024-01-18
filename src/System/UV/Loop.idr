@@ -25,16 +25,16 @@ record UVLoop where
   async : Ptr Async
   tg    : TokenGen
   cc    : CloseCB
-  ref   : IORef (SnocList EvalST)
+  ref   : IORef (SnocList $ IO ())
   limit : Nat
 
 export %inline %hint
-loopTokenGen : UVLoop => AsyncContext
-loopTokenGen @{l} =
-  AC
+loopCtxt : UVLoop => ExecutionContext
+loopCtxt @{l} =
+  EC
     l.tg
-    (\x => modifyIORef l.ref (:< x))
     (ignore (uv_async_send l.async))
+    (\x => modifyIORef l.ref (:< x))
     l.limit
 
 export %inline %hint
@@ -47,16 +47,16 @@ defaultLoop : IO UVLoop
 defaultLoop = do
   l   <- uv_default_loop
   tg  <- newTokenGen
-  ref <- newIORef {a = SnocList EvalST} [<]
+  ref <- newIORef {a = SnocList $ IO ()} [<]
   cc  <- defaultClose
   pa  <- mallocPtr Async
 
   let loop := MkLoop l pa tg cc ref 100
 
   r2  <- uv_async_init l pa $ \x => do
-           readIORef ref >>= \case
-             [<] => uv_close x cc
-             ss  => writeIORef ref [<] >> traverse_ eval (ss <>> [])
+           ss <- readIORef ref
+           writeIORef ref [<]
+           sequence_ (ss <>> [])
   pure loop
 
 parameters {auto has : Has UVError es}
@@ -71,66 +71,29 @@ parameters {auto has : Has UVError es}
 
   export
   uv : IO Int32 -> Async es ()
-  uv = liftEither . map uvRes
+  uv = sync . map uvRes
 
   export
   uvAct : Resource a => (a -> IO Int32) -> a -> Async es a
   uvAct f v = onAbort (uv $ f v) (release v) $> v
 
   export
-  uvOnce :
-       (ptr : r)
-    -> (close : r -> Async [] ())
-    -> ((a -> IO ()) -> IO Int32)
+  uvCancelableAsync :
+       (ptr : Async es r)
+    -> (cancel : (Outcome es a -> IO ()) -> r -> Async [] ())
+    -> (free   : r -> Async [] ())
+    -> (r -> (a -> IO ()) -> IO Int32)
     -> Async es a
-  uvOnce p close reg =
-    finally
-      (async $ \cb => do
-         n <- reg (cb . Succeeded)
+  uvCancelableAsync ptr cancel free reg =
+    bracket
+      ptr
+      (\p => cancelableAsync $ \cb => do
+         n <- reg p (cb . Succeeded)
          case uvRes n of
-           Left err => cb (Error err)
-           Right () => pure ()
+           Left err => cb (Error err) $> Nothing
+           Right () => pure () $> Just (cancel cb p)
            )
-      (close p)
-
-  export
-  uvOnce' :
-       (ptr : r)
-    -> (close : r -> Async [] ())
-    -> (IO () -> IO Int32)
-    -> Async es ()
-  uvOnce' p close reg = uvOnce p close (\f => reg (f ()))
-
-parameters {auto has : Has UVError es}
-           {auto l   : UVLoop}
-
-  export
-  uvForever :
-       (a -> Async es (Maybe b))
-    -> (ptr : r)
-    -> (close : r -> Async [] ())
-    -> ((a -> IO ()) -> IO Int32)
-    -> Async es b
-  uvForever to p close reg =
-    finally
-      (do
-        cc <- self
-        forever $ \cb => do
-          n <- reg (\va => childOnAsync (Just cc) (to va) cb)
-          case uvRes n of
-            Left err => cb (Error err)
-            Right () => pure ()
-      )
-      (close p)
-
-  export
-  uvForever' :
-       Async es (Maybe b)
-    -> (ptr : r)
-    -> (close : r -> Async [] ())
-    -> (IO () -> IO Int32)
-    -> Async es b
-  uvForever' as p close reg = uvForever (const as) p close (\f => reg (f ()))
+      free
 
   export
   uvAsync : ((Outcome es a -> IO ()) -> IO Int32) -> Async es a
@@ -144,10 +107,10 @@ parameters {auto has : Has UVError es}
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.
 covering export
-runUV : (UVLoop => IO ()) -> IO ()
+runUV : (UVLoop => Async [] ()) -> IO ()
 runUV act = do
   loop <- defaultLoop
-  act @{loop}
+  runAsync $ finally (act @{loop}) (liftIO $ uv_close loop.async loop.cc)
   res <- uv_run loop.loop (toCode Default)
   case uvRes {es = [UVError]} res of
     Left (Here err) => die "\{err}"

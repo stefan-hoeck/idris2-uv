@@ -48,29 +48,36 @@ ipname p = do
   freePtr cs
   pure res
 
-parameters {auto l : UVLoop}
-           {auto has : Has UVError es}
-
-  export
-  mkTcp : Async es (Ptr Tcp)
-  mkTcp = mallocPtr Tcp >>= uvAct (uv_tcp_init l.loop)
-
-  export
-  bindTcp : Ptr SockAddrIn -> Async es (Ptr Tcp)
-  bindTcp addr = mkTcp >>= uvAct (\x => uv_tcp_bind x addr 0)
-
-  export
-  acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
-  acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
-
-  export
-  listenTcp :
-       (addresss : String)
-    -> (port     : Bits16)
-    -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es a
-  listenTcp address port run =
-    use1 (mallocPtr SockAddrIn) $ \addr => do
-      uv (uv_ip4_addr address port addr)
-      server <- bindTcp addr
-      listen server run
+-- parameters {auto l : UVLoop}
+--            {auto has : Has UVError es}
+--
+--   export
+--   mkTcp : Async es (Ptr Tcp)
+--   mkTcp = mallocPtr Tcp >>= uvAct (uv_tcp_init l.loop)
+--
+--   export
+--   bindTcp : Ptr SockAddrIn -> Async es (Ptr Tcp)
+--   bindTcp addr = mkTcp >>= uvAct (\x => uv_tcp_bind x addr 0)
+--
+--   export
+--   acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
+--   acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
+--
+--   export covering
+--   listenTcp :
+--        (addresss : String)
+--     -> (port     : Bits16)
+--     -> (run      : Either UVError (Ptr Stream) -> Async es ())
+--     -> Async es ()
+--   listenTcp address port run =
+--     use1 (mallocPtr SockAddrIn) $ \addr => do
+--       uv (uv_ip4_addr address port addr)
+--       server <- bindTcp addr
+--       go server
+--
+--   where
+--     go : Ptr Stream -> Async es ()
+--     go server = do
+--       res <- listen server
+--       background (run res)
+--       go server

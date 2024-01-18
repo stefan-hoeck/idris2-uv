@@ -10,10 +10,7 @@ import public System.UV.Raw.Signal
 parameters {auto cc : CloseCB}
   export
   Resource (Ptr Signal) where
-    release h = uv_close h cc
-
-  signal_stop : Ptr Signal -> Async [] ()
-  signal_stop pt =ignore (uv_signal_stop pt) >> release pt
+    release h = putStrLn "Releasing signal" >> uv_close h cc
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
@@ -28,7 +25,9 @@ parameters {auto l   : UVLoop}
   |||       Wrap this in `start` to run it in the background.
   export
   onSignal : SigCode -> Async es SigCode
-  onSignal c = do
-    ps <- mkSignal
-    uvOnce ps signal_stop $
-      \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)
+  onSignal c =
+    uvCancelableAsync
+      mkSignal
+      (\cb,p => liftIO $ ignore (uv_signal_stop p) >> cb Canceled)
+      release
+      (\ps,cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c))

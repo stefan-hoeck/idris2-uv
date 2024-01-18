@@ -1,8 +1,5 @@
 module IO.Async.Async
 
-import Data.IORef
-
-import IO.Async.CancelState
 import IO.Async.Fiber
 import IO.Async.MVar
 import IO.Async.Outcome
@@ -33,10 +30,6 @@ disp C = "cancelable"
 disp P = "parent"
 disp U = "uncancelable"
 
-cancelNow : Bool -> Cancelability -> Bool
-cancelNow True C = True
-cancelNow _    _ = False
-
 --------------------------------------------------------------------------------
 -- Async data type
 --------------------------------------------------------------------------------
@@ -56,212 +49,150 @@ cancelNow _    _ = False
 ||| is taken from the outer scope with the outermost scope being
 ||| "cancelable".
 export
-data Async : (es : List Type) -> (a : Type) -> Type
-
--- Primitive computations
-data Prim : List Type -> Type -> Type where
-  -- lifte `IO` action
-  Sync   : IO (Outcome es a) -> Prim es a
-
-  -- registering function for a callback that's potentially
-  -- running forever
-  CB     : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Prim es a
-
-  -- spawn a new fiber with the given computation
-  Start  : Async es a -> Prim es (Fiber es a)
-
-  -- out cancel state that can be used when spawning a new fiber.
-  Self   : Prim es (MVar CancelState)
-
-  -- repeatedly poll the given `IO` action until it yields a `Just`
-  Poll   : IO (Maybe $ Outcome es a) -> Prim es a
-
-  -- cancel the current fiber
-  Cancel : Prim es ()
-
-export
 data Async : List Type -> Type -> Type where
-  -- a primitive computation together with its cancelability
-  AP   : Cancelability -> Prim es a -> Async es a
+  Term   : Outcome es a -> Async es a
 
-  -- generalized monadic bind plus its cancelability.
-  --
-  -- Note: Even if the cancelability is set to "cancelable" (`C`),
-  -- one of the child computations might still be uncancelable
-  -- and must be run to completion.
-  AB : Cancelability -> Async es a -> (Outcome es a -> Async fs b) -> Async fs b
+  Cancel : Async es a
 
-||| Print some debugging information about the inner
-||| structure and cancelability of an `Async` computation.
-export
-type : Async es a -> String
+  Self   : Async es AnyFiber
 
-primType : Prim es a -> String
-primType (Sync x)  = "Sync"
-primType (CB f)    = "CB"
-primType (Start x) = "Start of \{type x}"
-primType (Poll x)  = "Poll"
-primType Cancel    = "Cancel"
-primType Self      = "Self"
+  Ctxt   : Async es ExecutionContext
 
-type (AP c x)   = "AP(\{disp c}) of \{primType x}"
-type (AB c x f) = "AB(\{disp c}) of \{type x}"
+  Sync   : Cancelability -> IO (Result es a) -> Async es a
 
-depth : Async es a -> Nat
-depth (AP _ _)   = 0
-depth (AB _ x _) = S $ depth x
+  PollC  : IO (Maybe $ Outcome es a) -> Async [] () -> Async es a
 
---------------------------------------------------------------------------------
--- Synchronous utilities
---------------------------------------------------------------------------------
+  Poll   : IO (Maybe $ Outcome es a) -> Async es a
 
-||| Lifts a synchronous `IO` action into the `Async` monad.
-export %inline
-sync : IO (Outcome es a) -> Async es a
-sync io = AP P $ Sync io
+  Start  : Cancelability -> Async es a -> Async es (Fiber es a)
 
-||| Lifts a synchronous `IO` action with the possibility of failure
-||| into the `Async` monad.
-export %inline
-liftEither : IO (Result es a) -> Async es a
-liftEither = sync . map toOutcome
-
-||| Lifts a pure value into the `Async` monad.
-export %inline
-liftResult : Result es a -> Async es a
-liftResult = liftEither . pure
-
-||| Lifts a pure value into the `Async` monad.
-export %inline
-succeed : a -> Async es a
-succeed = liftResult . Right
-
-%inline
-canceled : Async es a
-canceled = sync . pure $ Canceled
-
-||| Fail with an error.
-export %inline
-fail : HSum es -> Async es a
-fail = liftResult . Left
-
-||| Fail with a specific error.
-export %inline
-throw : Has e es => e -> Async es a
-throw = fail . inject
-
---------------------------------------------------------------------------------
--- Cancelling fibers
---------------------------------------------------------------------------------
-
-||| Sets the given computation's cancelability to "cancelable" if it
-||| is currently at "parent".
-|||
-||| If you plan to enforce cancelability no matter what, use
-||| `strictCancelable`.
-export
-cancelable : Async es a -> Async es a
-cancelable (AP P x)   = AP C x
-cancelable (AB P x f) = AB C x f
-cancelable x          = x
-
-||| Sets the given computation's cancelability to "cancelable".
-export
-strictCancelable : Async es a -> Async es a
-strictCancelable (AP _ x)   = AP C x
-strictCancelable (AB _ x f) = AB C x f
-
-||| Sets the given computation's cancelability to "uncancelable".
-export
-uncancelable : Async es a -> Async es a
-uncancelable (AP _ x)   = AP U x
-uncancelable (AB _ x f) = AB U x f
-
-||| Cancels the current fiber, stopping all asynchronous computations
-||| as soon as possible by respecting their cancelability.
-export %inline
-cancel : Async es ()
-cancel = AP P Cancel
+  -- generalized monadic bind
+  Bind   :
+       Cancelability
+    -> Async es a
+    -> (Outcome es a -> Async fs b)
+    -> Async fs b
 
 --------------------------------------------------------------------------------
 -- Interface Implementations
 --------------------------------------------------------------------------------
 
--- implementation of (>>=)
+export %inline
+succeed : a -> Async es a
+succeed = Term . Succeeded
+
+export %inline
+sync : IO (Result es a) -> Async es a
+sync = Sync P
+
 bind : Async es a -> (a -> Async es b) -> Async es b
-bind aa f =
-  AB P aa $ \case
+bind x f =
+  Bind P x $ \case
     Succeeded v => f v
-    Error err   => fail err
-    Canceled    => canceled
+    Error x     => Term (Error x)
+    Canceled    => Term Canceled
 
 export
 Functor (Async es) where
   map f aa = bind aa (succeed . f)
 
-export
+export %inline
 Applicative (Async es) where
   pure      = succeed
   af <*> aa = bind af (<$> aa)
 
-export
+export %inline
 Monad (Async es) where
   (>>=) = bind
 
 export
 HasIO (Async es) where
-  liftIO = sync . map Succeeded
+  liftIO = sync . map Right
 
 --------------------------------------------------------------------------------
--- Error handling
+-- MonadCancel
 --------------------------------------------------------------------------------
 
 export
-catch : (HSum es -> Async fs a) -> Async es a -> Async fs a
-catch f as =
-  AB U (cancelable as) $ \case
-    Succeeded a => pure a
-    Error err   => f err
-    Canceled    => canceled
+uncancelable : Async fs a -> Async fs a
+uncancelable (Sync x y)   = Sync U y
+uncancelable (Bind x y f) = Bind U y f
+uncancelable v            = v
 
 export
+cancelable : Async fs a -> Async fs a
+cancelable (Sync P y)   = Sync C y
+cancelable (Bind P y f) = Bind C y f
+cancelable v            = v
+
+export
+strictCancelable : Async fs a -> Async fs a
+strictCancelable (Sync _ y)   = Sync C y
+strictCancelable (Bind _ y f) = Bind C y f
+strictCancelable v            = v
+
+export
+canceled : Async es ()
+canceled = Cancel
+
+export
+join : Fiber es a -> Async fs (Outcome es a)
+join f = PollC (map Succeeded <$> poll f) (liftIO $ cancelIO f)
+
+export
+cancel : Fiber es a -> Async fs ()
+cancel f =
+  uncancelable $ do
+    liftIO (cancelIO f)
+    ignore $ Poll (map Succeeded <$> poll f)
+
+||| Runs an asynchronous computation in the background on a new fiber.
+|||
+||| The resulting fiber can be canceled from the current fiber, and
+||| we can semantically block the current fiber to whait for the background
+||| computation to complete.
+|||
+||| See also `(.cancel)` and `(.await)`.
+export %inline
+start : Async es a -> Async es (Fiber es a)
+start as = Start P as
+
+--------------------------------------------------------------------------------
+-- MonadError
+--------------------------------------------------------------------------------
+
+export %inline
+fail : HSum es -> Async es a
+fail = Term . Error
+
+export %inline
+throw : Has e es => e -> Async es a
+throw = fail . inject
+
+export %inline
+handleErrors : (HSum es -> Async fs a) -> Async es a -> Async fs a
+handleErrors f x =
+  Bind U x $ \case
+    Succeeded x => Term $ Succeeded x
+    Error x     => f x
+    Canceled    => Term Canceled
+
+export %inline
 dropErrs : Async es () -> Async [] ()
-dropErrs = catch (const $ pure ())
+dropErrs = handleErrors (const $ pure ())
 
-export
+export %inline
 handle : All (\x => x -> Async [] a) es -> Async es a -> Async [] a
-handle hs = catch (collapse' . hzipWith id hs)
+handle hs = handleErrors (collapse' . hzipWith id hs)
 
---------------------------------------------------------------------------------
--- Resource management
---------------------------------------------------------------------------------
-
-||| Run the given cleanup function after `act` returns a result no matter
-||| what.
-|||
-||| This is the core utility for doing resource management: After you
-||| aqcuire a scarce resource such as a file handle that needs to be
-||| released once a computation is done, wrap it in one of the
-||| finalizers such as `guarantee`, `onCancel`, `onArbort`, or
-||| `finally`.
 export
-guarantee :
-     (act : Async es a)
-  -> (cleanup : Outcome es a -> Async [] ())
-  -> Async es a
-guarantee as fun =
-  AB U (cancelable as) (\o => AB U (fun o) (\_ => sync $ pure o))
+guaranteeCase : Async es a -> (Outcome es a -> Async [] ()) -> Async es a
+guaranteeCase as f =
+  Bind U as $ \o => Bind U (uncancelable $ f o) (\_ => Term o)
 
-||| Guarantees to run the given cleanup hook in case a fiber
-||| has been canceled.
-|||
-||| See `guarantee` for additional information.
-export
-onCancel : Async es a -> (cleanup : Async [] ()) -> Async es a
-onCancel as h =
-  guarantee as $ \case
-    Canceled => h
-    _        => pure ()
+export %inline
+onCancel : Async es a -> Async [] () -> Async es a
+onCancel as x = guaranteeCase as $ \case Canceled => x; _ => pure ()
 
 ||| Guarantees to run the given cleanup hook in case a fiber
 ||| has been canceled or failed with an error.
@@ -270,7 +201,7 @@ onCancel as h =
 export
 onAbort : Async es a -> (cleanup : Async [] ()) -> Async es a
 onAbort as h =
-  guarantee as $ \case
+  guaranteeCase as $ \case
     Canceled => h
     Error _  => h
     _        => pure ()
@@ -281,11 +212,52 @@ onAbort as h =
 ||| See `guarantee` for additional information.
 export %inline
 finally : Async es a -> (cleanup : Async [] ()) -> Async es a
-finally aa v = guarantee aa (\_ => v)
+finally aa v = guaranteeCase aa (\_ => v)
+
+export %inline
+forget : Async es a -> Async [] ()
+forget as = Bind P as (\_ => pure ())
+
+export
+consume : Async es a -> (Outcome es a -> IO ()) -> Async [] ()
+consume as cb = forget $ guaranteeCase as (liftIO . cb)
+
+export
+bracketCase :
+     Async es a
+  -> (a -> Async es b)
+  -> ((a,Outcome es b) -> Async [] ())
+  -> Async es b
+bracketCase acquire use release =
+  uncancelable $ do
+    res <- acquire
+    guaranteeCase (use res) (\o => release (res,o))
+
+export %inline
+bracket : Async es a -> (a -> Async es b) -> (a -> Async [] ()) -> Async es b
+bracket acquire use release =
+  bracketCase acquire use (release . fst)
 
 --------------------------------------------------------------------------------
--- Asynchronous utilities
+-- Async
 --------------------------------------------------------------------------------
+
+export %inline
+executionContext : Async es ExecutionContext
+executionContext = Ctxt
+
+export
+cancelableAsync :
+     ((Outcome es a -> IO ()) -> IO (Maybe $ Async [] ()))
+  -> Async es a
+cancelableAsync reg =
+  uncancelable $ do
+    ec <- executionContext
+    as <- cancelable $ liftIO $ do
+      m <- newMVar Nothing
+      c <- reg (\o => modifyMVar m (<|> Just o) >> ec.wakeup)
+      pure $ maybe (Poll $ readMVar m) (PollC $ readMVar m) c
+    as
 
 ||| Registers a callback (of type `Outcome es a -> IO ()`) at some
 ||| external resource and finishes once the callback has been invoked
@@ -297,57 +269,7 @@ finally aa v = guarantee aa (\_ => v)
 ||| wrap it with `start`.
 export %inline
 async : ((Outcome es a -> IO ()) -> IO ()) -> Async es a
-async reg = AP P $ CB $ \x => reg (x . map Just)
-
-||| Asynchronously evaluates a pure computation.
-export %inline
-delay : Lazy a -> Async es a
-delay v = async $ \cb => cb (Succeeded v)
-
-||| Like `async`, but the callback might be invoked many times with
-||| a result of `Nothing`, indicating that although the computation
-||| has been run, it is not finished yet.
-|||
-||| An example for this could be a timer that repeatedly invokes its callback
-||| after a given duration.
-|||
-||| This will semantically block the current fiber.
-|||
-||| If you want to run this in the background without blocking,
-||| wrap it with `start`.
-export %inline
-forever : ((Outcome es (Maybe a) -> IO ()) -> IO ()) -> Async es a
-forever f = AP P $ CB f
-
-||| Runs an asynchronous computation in the background on a new fiber.
-|||
-||| The resulting fiber can be canceled from the current fiber, and
-||| we can semantically block the current fiber to whait for the background
-||| computation to complete.
-|||
-||| See also `(.cancel)` and `(.await)`.
-export %inline
-start : Async es a -> Async es (Fiber es a)
-start as = AP P $ Start as
-
-||| Cancels a computation on another fibers.
-|||
-||| This will semantically block the current fiber until
-||| the cancellee has finished with an outcome.
-export
-(.cancel) : Fiber es a -> Async es ()
-(.cancel) f = do
-  liftIO $
-    for_ f.parent (\p => removeChild p f.token) >>
-    ignore (cancel f.canceled)
-  AB P (AP P . Poll $ tryGet f.outcome) (\_ => succeed ())
-
-||| Semantically blocks the current fiber until the target fiber
-||| has produced a result, in which case we continue with that
-||| result.
-export
-(.await) : Fiber es a -> Async es a
-(.await) f = AP P . Poll $ tryGet f.outcome
+async reg = cancelableAsync (\o => reg o $> Nothing)
 
 ||| Semantically blocks the current fiber until one
 ||| of the given fibers has produced an outcome, in which
@@ -360,17 +282,16 @@ export
 export
 raceF : List (Async es (Fiber es a)) -> Async es a
 raceF fs = do
-  fibers <- sequence fs
-  finally
-    (AP P . Poll $ pollAll fibers)
-    (dropErrs $ traverse_ (.cancel) fibers)
+  bracket
+    (sequence fs)
+    (\fibers => PollC (liftIO $ pollAll fibers) (traverse_ cancel fibers))
+    (\fibers => traverse_ cancel fibers)
   where
     pollAll : List (Fiber es a) -> IO (Maybe $ Outcome es a)
     pollAll []        = pure Nothing
     pollAll (x :: xs) = do
-      Nothing <- tryGet x.outcome | Just v => pure (Just v)
+      Nothing <- poll x | v => pure v
       pollAll xs
-
 
 ||| Alias for `raceF . traverse start`.
 export %inline
@@ -402,13 +323,13 @@ export
 parF : All (Async es . Fiber es) ts -> Async es (HList ts)
 parF fs = do
   fibers <- hsequence fs
-  AP P . Poll $ pollAll fibers
+  PollC (pollAll fibers) (ignore . hsequence $ mapProperty cancel fibers)
   where
     pollAll : All (Fiber es) ss -> IO (Maybe $ Outcome es (HList ss))
     pollAll =
         map (map collectOutcomes . hsequence)
       . hsequence
-      . mapProperty (tryGet . outcome)
+      . mapProperty poll
 
 ||| Runs the given computations in parallel and collects the outcomes
 ||| in a heterogeneous list.
@@ -416,194 +337,86 @@ export %inline
 par : All (Async es) ts -> Async es (HList ts)
 par = parF . mapProperty start
 
+--------------------------------------------------------------------------------
+-- Unique (cats-effects interface, follows from HasIO)
+--------------------------------------------------------------------------------
+
 export %inline
-self : Async es (MVar CancelState)
-self = AP P Self
+unique : (tg : TokenGen) => Async es Token
+unique = token
 
 --------------------------------------------------------------------------------
 -- Evaluation
 --------------------------------------------------------------------------------
 
-data Stack : (es,fs : List Type) -> (a,b : Type) -> Type where
-  Nil  : Stack es es a a
+data Stack : (es : List Type) -> (a : Type) -> Type where
+  Nil  : Stack [] ()
   (::) :
        (Cancelability, (Outcome es a -> Async fs b))
-    -> Stack fs gs b c
-    -> Stack es gs a c
-
-||| Intermediary state of a running asynchronous computation
-||| concisting of the fiber it is running on and the current
-||| state of evaluation.
-export
-record EvalST where
-  constructor EST
-  {0 ers1,ers2 : List Type}
-  {0 res1,res2 : Type}
-  fiber        : Fiber ers2 res2
-  act          : Async ers1 res1
-  stack        : Stack ers1 ers2 res1 res2
-
-||| Context for running asynchronous computations.
-|||
-||| It wraps a `TokenGen` for generating unique IDs for
-||| freshly spawned fibers, plus a function `submit`,
-||| for putting the current evaluation as well as the
-||| state of newly started fibers on an evaluation queue.
-public export
-record AsyncContext where
-  [noHints]
-  constructor AC
-  ||| Generator for unique fiber tokens
-  tokenGen : TokenGen
-
-  ||| Function to submit and start new asynchronous
-  ||| computations (fibers)
-  submit   : EvalST -> IO ()
-
-  ||| Wake up the context:w
-  wakeup   : IO ()
-
-  ||| Maximal number of iterations before we cede evaluation
-  ||| to the next fiber.
-  limit    : Nat
-
-export %inline %hint
-contextToTokenGen : AsyncContext => TokenGen
-contextToTokenGen @{c} = c.tokenGen
-
--- result of a single step of evaluation.
--- boolean values indicate whether the current fiber has
--- been canceled before or during the evaluation.
-data PrimRes : (es : List Type) -> Type -> Type where
-  Cede : Bool -> Async es a -> PrimRes es a
-  Done : Bool -> Outcome es a -> PrimRes es a
-
-data EvalRes : (es : List Type) -> Type -> Type where
-  ECont : Bool -> Async es a -> Stack es fs a b -> EvalRes fs b
-  ECede : Bool -> Async es a -> Stack es fs a b -> EvalRes fs b
-  EDone : Bool -> Outcome es a -> EvalRes es a
-
--- debug string for outcomes
-doneType : Outcome es a -> String
-doneType (Succeeded res) = "Succeeded"
-doneType (Error err) = "Error"
-doneType Canceled = "Canceled"
-
--- debug string for outcomes
-resDebugMsg : PrimRes es a -> String
-resDebugMsg (Cede b x) =
-  "Cede (\{show b}) of type \{type x} and depth \{show $ depth x}"
-resDebugMsg (Done b x) =
-  "Done (\{show b}) of type \{doneType x}"
+    -> Stack fs b
+    -> Stack es a
 
 set : Cancelability -> Async es a -> Async es a
-set x (AP y z)   = AP (x <+> y) z
-set x (AB y z f) = AB (x <+> y) z f
+set x (Sync y z)   = Sync (x <+> y) z
+set x (Bind y z f) = Bind (x <+> y) z f
+set _ y            = y
 
-parameters {auto ctxt : AsyncContext}
+observeCancelation : Cancelability -> AnyFiber -> IO Bool
+observeCancelation U _ = pure False
+observeCancelation _ f = canceled f
 
-  runDeferred :
-       ((Outcome es (Maybe a) -> IO ()) -> IO ())
-    -> Deferred (Outcome es a)
-    -> IO ()
-  runDeferred f x =
-    f $ \y => do
-      case y of
-        Succeeded (Just a) => ignore $ complete x (Succeeded a)
-        Succeeded Nothing  => pure ()
-        Canceled           => ignore $ complete x Canceled
-        Error err          => ignore $ complete x (Error err)
-      ctxt.wakeup
-
-  prim :
-       MVar CancelState
-    -> Bool
-    -> Cancelability
-    -> Prim es a
-    -> PrimIO (PrimRes es a)
-  prim m True C _ w = MkIORes (Done True Canceled) w
-
-  prim m b c (Sync x) w =
-    let MkIORes v w2 := toPrim x w
-     in MkIORes (Done b v) w2
-
-  prim m b c (CB f) w =
-    let MkIORes def w2 := toPrim newDeferred w
-        MkIORes ()  w3 := toPrim (runDeferred f def) w2
-     in MkIORes (Cede b . AP c . Poll $ tryGet def) w3
-
-  prim m b c (Start x) w =
-    let MkIORes fbr w2 := toPrim (newFiber (Just m)) w
-        MkIORes ()  w3 := toPrim (ctxt.submit (EST fbr x [])) w2
-        MkIORes ()  w4 := toPrim ctxt.wakeup w3
-     in MkIORes (Done b $ Succeeded fbr) w4
-
-  prim m b c (Poll x)  w =
-    let MkIORes Nothing w2 := toPrim x w
-          | MkIORes (Just v) w2 => MkIORes (Done b v) w2
-     in MkIORes (Cede b . AP c $ Poll x) w2
-
-  prim m b c Self w = MkIORes (Done b $ Succeeded m) w
-
-  prim m b c Cancel w = MkIORes (Done True Canceled) w
-
-  step :
-       Nat
-    -> MVar CancelState
-    -> Bool
-    -> Async es a
-    -> Stack es fs a b
-    -> PrimIO (EvalRes fs b)
-  step 0     m b act stck w = MkIORes (ECont b act stck) w
-
-  step (S k) m b (AB c p f) stck w =
-    step k m b (set c p) ((c,f)::stck) w
-
-  step (S k) m b (AP c p) stck w =
-    let MkIORes (Done b2 o) w2 := prim m b c p w
-          | MkIORes (Cede b2 v) w2 => MkIORes (ECede b2 v stck) w2
-     in case stck of
-          []       => MkIORes (EDone b2 o) w2
-          (d,f)::t => case cancelNow b2 d of
-            True  => MkIORes (EDone b2 Canceled) w2
-            False => step k m b2 (set c $ f o) t w2
-
-  export
-  eval : EvalST -> IO ()
-  eval (EST f act stck) = do
-    cs  <- readMVar f.canceled
-    res <- primIO (step ctxt.limit f.canceled cs.canceled act stck)
-    case res of
-      ECont b act' stck' =>
-        cancel b f >> ctxt.submit (EST f act' stck') >> ctxt.wakeup
-      ECede b act' stck' =>
-        cancel b f >> ctxt.submit (EST f act' stck')
-      EDone b res        =>
-        cancel b f >> ignore (complete f.outcome res) >> ctxt.wakeup
-
---------------------------------------------------------------------------------
--- Running asynchronous computations
---------------------------------------------------------------------------------
-
-export
-childOnAsync :
-     {auto ctxt : AsyncContext}
-  -> (parent : Maybe $ MVar CancelState)
+covering
+step :
+     {auto ec : ExecutionContext}
+  -> Nat
+  -> AnyFiber
   -> Async es a
-  -> (Outcome es a -> IO ())
+  -> Stack es a
   -> IO ()
-childOnAsync parent as cb = do
-  fb <- newFiber parent
-  ctxt.submit (EST fb (guarantee as (liftIO . cb)) [])
-  ctxt.wakeup
+step 0 m act stck = submitAndWakeup ec (step ec.limit m act stck)
 
-||| Runs the given asynchronous computation to completion
-||| invoking the given callback once it is done.
-export %inline
-onAsync : AsyncContext => Async es a -> (Outcome es a -> IO ()) -> IO ()
-onAsync = childOnAsync Nothing
+step (S k) m (Bind c x f) stck = step k m (set c x) ((c,f)::stck)
 
-||| Asynchronously runs the given computation to completion.
-export %inline
-runAsync : AsyncContext => Async [] () -> IO ()
-runAsync as = onAsync as (\_ => pure ())
+step (S k) m (Term o) []         = pure ()
+step (S k) m (Term o) ((c,f)::t) = do
+  False <- observeCancelation c m | True => step k m (Term Canceled) t
+  step k m (set c $ f o) t
+
+step (S k) m (Sync c act) stck = do
+  False <- observeCancelation c m | True => step k m (Term Canceled) stck
+  r <- act
+  step k m (Term $ toOutcome r) stck
+
+step (S k) m (PollC io cncl) stck = do
+  False  <- canceled m
+    | True => step k m (uncancelable cncl) ((U, \_ => Poll io) :: stck)
+  Just o <- io | Nothing => ec.submit (step k m (PollC io cncl) stck)
+  step k m (Term o) stck
+
+step (S k) m (Poll io) stck = do
+  Just o <- io | Nothing => ec.submit (step k m (Poll io) stck)
+  step k m (Term o) stck
+
+step (S k) m Self stck = step k m (pure m) stck
+
+step (S k) m Ctxt stck = step k m (pure ec) stck
+
+step (S k) m Cancel stck = cancelAny m >> step k m (Term Canceled) stck
+
+step (S k) m (Start c as) stck = do
+  False <- observeCancelation c m | True => step k m (Term Canceled) stck
+  fib   <- newFiber ec (Just m)
+  submitAndWakeup ec $ step ec.limit (AF fib) (consume as $ commit fib) []
+  step k m (pure fib) stck
+
+parameters {auto ec : ExecutionContext}
+
+  export covering
+  runAsync : Async [] () -> IO ()
+  runAsync as = do
+    fib <- newFiber {a = ()} {es = []} ec Nothing
+    submitAndWakeup ec $ step ec.limit (AF fib) as []
+
+  export covering %inline
+  runAsyncWith : Async es a -> (Outcome es a -> IO ()) -> IO ()
+  runAsyncWith as cb = runAsync $ consume as cb

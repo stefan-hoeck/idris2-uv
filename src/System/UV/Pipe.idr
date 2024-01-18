@@ -35,9 +35,9 @@ parameters {auto l : UVLoop}
   stdinOpen : Async es (Ptr Pipe)
   stdinOpen = pipeOpen stdin
 
-  export
-  streamStdin :
-       AllocCB
-    -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es a
-  streamStdin ac run = use1 stdinOpen $ \h => streamRead ac h run
+--  export
+--  streamStdin :
+--       AllocCB
+--    -> (ReadRes ByteString -> Async es (Maybe a))
+--    -> Async es a
+--  streamStdin ac run = use1 stdinOpen $ \h => streamRead ac h run

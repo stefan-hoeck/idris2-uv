@@ -27,7 +27,7 @@ handles : All (\x => x -> Async [] ()) [UVError]
 handles = [putStrLn . interpolate]
 
 runDoc : (UVLoop => DocIO ()) -> IO ()
-runDoc doc = runUV $ runAsync (handle handles doc)
+runDoc doc = runUV $ handle handles doc
 ```
 
 So, `DocIO a` is an alias for `Async [UVError] a`, which is a computation
@@ -50,33 +50,36 @@ after five seconds, whichever comes first.
 Here's the code:
 
 ```idris
-parameters {auto l : UVLoop}
-
-  checkCounter : IORef Integer -> DocIO (Maybe ())
-  checkCounter ref = do
-    modifyIORef ref (+1)
-    v <- readIORef ref
-    when (v `mod` 10000 == 0) (putOutLn "Counter is at \{show v}")
-    pure Nothing
-
-  idleExample : DocIO ()
-  idleExample = do
-    putStrLn "Hello World"
-    ref     <- newIORef 0
-    putStrLn "Starting the counter"
-    counter <- start $ onIdle (checkCounter ref)
-
-    res     <- raceAny [onSignal SIGINT, once 5000]
-
-    case res of
-      Here sig => putOutLn "Counter interrupted by \{show sig}"
-      _        => putOutLn "Counter interrupted by timeout"
-
-    putOutLn "Cancelling counter"
-    cancel
+-- parameters {auto l : UVLoop}
+--
+--   checkCounter : IORef Integer -> DocIO (Maybe ())
+--   checkCounter ref = do
+--     modifyIORef ref (+1)
+--     v <- readIORef ref
+--     when (v `mod` 10000 == 0) (putOutLn "Counter is at \{show v}")
+--     pure Nothing
+--
+--   idleExample : DocIO ()
+--   idleExample = do
+--     putStrLn "Hello World"
+--     ref     <- newIORef 0
+--     putStrLn "Starting the counter"
+--     counter <- start $ onIdle (checkCounter ref)
+--
+--     res     <- raceAny [onSignal SIGINT, once 5000]
+--
+--     case res of
+--       Here sig => putOutLn "Counter interrupted by \{show sig}"
+--       _        => putOutLn "Counter interrupted by timeout"
+--
+--     putOutLn "Cancelling counter"
+--     cancel
 
 -- main : IO ()
--- main = runDoc idleExample
+-- main = runDoc $ do
+--   putStrLn "Going to sleep"
+--   race [sleep 2000, sleep 3100, sleep 500, ignore $ onSignal SIGINT]
+--   putOutLn "Good morning"
 ```
 
 First, we note that `Async` comes with an implementation of `MonadIO`,
@@ -120,7 +123,7 @@ parameters {auto l : UVLoop}
     v <- use1 (fsOpen "out" (WRONLY <+> CREAT) 0o644) $ \f =>
            raceAny
              [ onSignal SIGINT
-             , once 10000
+             , sleep 10000
              , streamFile p 0xffff $ writeBytes f
              ]
 
@@ -129,8 +132,8 @@ parameters {auto l : UVLoop}
       There (Here _) => putOutLn "Stream interrupted by timeout"
       _              => putOutLn "Stream exhausted."
 
--- main : IO ()
--- main = runDoc fileStreamExample
+main : IO ()
+main = runDoc fileStreamExample
 ```
 
 ## An echo Server
@@ -141,30 +144,30 @@ connections before shutting down (which happens, when
 `SIGINT` is received).
 
 ```idris
-parameters {auto l : UVLoop}
-  onConnection : AllocCB -> Ptr Stream -> DocIO (Maybe ())
-  onConnection ac server = do
-    putOutLn "Got a connection"
-    client <- acceptTcp server
-    _      <- start $ streamReadWrite ac client $ \case
-      Done     => pure (Just ())
-      Data val => write client val $> Nothing
-      Err x    => throw x
-    pure Nothing
-
-  echo : DocIO ()
-  echo = do
-    ac <- sizedAlloc 0xffff
-    server <- start $ listenTcp "0.0.0.0" 7000 $ \case
-      Left err  => putErrLn "Error when receiving request: \{err}" $> Nothing
-      Right srv => onConnection ac srv
-
-    ignore $ onSignal SIGINT
-    putOutLn "Shutting down server..."
-    cancel
-
-main : IO ()
-main = runDoc echo
+-- parameters {auto l : UVLoop}
+--   onConnection : AllocCB -> Ptr Stream -> DocIO (Maybe ())
+--   onConnection ac server = do
+--     putOutLn "Got a connection"
+--     client <- acceptTcp server
+--     _      <- start $ streamReadWrite ac client $ \case
+--       Done     => pure (Just ())
+--       Data val => write client val $> Nothing
+--       Err x    => throw x
+--     pure Nothing
+--
+--   echo : DocIO ()
+--   echo = do
+--     ac <- sizedAlloc 0xffff
+--     server <- start $ listenTcp "0.0.0.0" 7000 $ \case
+--       Left err  => putErrLn "Error when receiving request: \{err}" $> Nothing
+--       Right srv => onConnection ac srv
+--
+--     ignore $ onSignal SIGINT
+--     putOutLn "Shutting down server..."
+--     cancel
+--
+-- main : IO ()
+-- main = runDoc echo
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown
