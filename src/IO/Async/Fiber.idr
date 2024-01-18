@@ -80,6 +80,14 @@ addChild (AF fbr) k v =
   withLock fbr.mutex (modifyIORef fbr.children $ insert k v)
 
 export
+clearChildren : AnyFiber -> IO (List AnyFiber)
+clearChildren (AF f) =
+  withLock f.mutex $ do
+    cs <- readIORef f.children
+    writeIORef f.children empty
+    pure $ values cs
+
+export
 commit : Fiber es a -> Outcome es a -> IO ()
 commit fbr o = do
   run <- withLock fbr.mutex $ do
@@ -87,13 +95,8 @@ commit fbr o = do
       Just _  => pure (pure ())
       Nothing => do
         writeIORef fbr.outcome (Just o)
-        cs  <- readIORef fbr.children
-
-        writeIORef fbr.children empty
-
         pure $
           for_ fbr.parent (`removeChild `fbr.token) >>
-          for_ cs cancelAny >>
           fbr.ec.wakeup
   run
 

@@ -146,6 +146,10 @@ cancel f =
     liftIO (cancelIO f)
     ignore $ Poll (map Succeeded <$> poll f)
 
+export
+cancelAny : AnyFiber -> Async [] ()
+cancelAny (AF f) = cancel f
+
 ||| Runs an asynchronous computation in the background on a new fiber.
 |||
 ||| The resulting fiber can be canceled from the current fiber, and
@@ -377,7 +381,11 @@ step 0 m act stck = submitAndWakeup ec (step ec.limit m act stck)
 
 step (S k) m (Bind c x f) stck = step k m (set c x) ((c,f)::stck)
 
-step (S k) m (Term o) []         = pure ()
+step (S k) m (Term o) []         =
+  clearChildren m >>= \case
+    [] => pure ()
+    cs => step k m (traverse_ cancelAny cs) []
+
 step (S k) m (Term o) ((c,f)::t) = do
   False <- observeCancelation c m | True => step k m (Term Canceled) t
   step k m (set c $ f o) t
