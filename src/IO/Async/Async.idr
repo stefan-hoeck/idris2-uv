@@ -251,6 +251,10 @@ poll : IO (Maybe $ Outcome es a) -> Async es a
 poll = Poll
 
 export %inline
+pollMaybe : IO (Maybe a) -> Async es a
+pollMaybe = poll . map (map Succeeded)
+
+export %inline
 cancelablePoll : IO (Maybe $ Outcome es a) -> Async [] () -> Async es a
 cancelablePoll = PollC
 

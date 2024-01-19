@@ -12,7 +12,6 @@ depends = base >= 0.6.0
 
 modules = IO.Async
         , IO.Async.Async
-        , IO.Async.CancelState
         , IO.Async.Fiber
         , IO.Async.MVar
         , IO.Async.Outcome

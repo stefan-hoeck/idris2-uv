@@ -1,6 +1,5 @@
 module System.UV.Loop
 
-import IO.Async.CancelState
 import IO.Async.MVar
 import IO.Async.Token
 
