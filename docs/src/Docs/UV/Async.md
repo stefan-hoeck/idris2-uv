@@ -107,7 +107,7 @@ parameters {auto l : UVLoop}
   fileStreamExample : DocIO ()
   fileStreamExample = do
     (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
-    v <- use1 (fsOpen "out" (WRONLY <+> CREAT) 0o644) $ \f =>
+    v <- use1 (writeOpen "out") $ \f =>
            raceAny
              [ onSignal SIGINT
              , sleep 10000
@@ -119,8 +119,22 @@ parameters {auto l : UVLoop}
       There (Here _) => putOutLn "Stream interrupted by timeout"
       _              => putOutLn "Stream exhausted."
 
--- main : IO ()
--- main = runDoc fileStreamExample
+  lineCount : DocIO ()
+  lineCount = do
+    (_::p::_) <- getArgs | _ => putErrLn "Invalid number of arguments"
+    v <- raceAny
+           [ onSignal SIGINT
+           , sleep 10000
+           , foldLines p 0xfffff (\x,_ => S x) 0
+           ]
+
+    case v of
+      Here s         => putOutLn "Stream interrupted by \{show s}"
+      There (Here _) => putOutLn "Stream interrupted by timeout"
+      There (There $ Here v) => putOutLn "Counter \{show v} lines"
+
+main : IO ()
+main = runDoc lineCount
 ```
 
 ## An echo Server
@@ -166,8 +180,8 @@ parameters {auto l : UVLoop}
     race [listenTcp "0.0.0.0" 7000 (serve ac), ignore $ onSignal SIGINT]
     putOutLn "Shutting down server..."
 
-main : IO ()
-main = runDoc echo
+-- main : IO ()
+-- main = runDoc echo
 ```
 
 <!-- vi: filetype=idris2:syntax=markdown
