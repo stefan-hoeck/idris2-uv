@@ -42,6 +42,33 @@ export %inline
 UVLoop => Resource File where
   release = fsClose
 
+--------------------------------------------------------------------------------
+-- File Errors
+--------------------------------------------------------------------------------
+
+public export
+data UVFileError : Type where
+  OpenError  : String -> UVError -> UVFileError
+  ReadError  : String -> UVError -> UVFileError
+  WriteError : String -> UVError -> UVFileError
+
+export
+Interpolation UVFileError where
+  interpolate (OpenError s x)  = "Error when opening \{s}: \{errorMsg x}"
+  interpolate (ReadError s x)  = "Error when reading \{s}: \{errorMsg x}"
+  interpolate (WriteError s x) = "Error when writing to \{s}: \{errorMsg x}"
+
+toFileError :
+     {auto has : Has UVFileError es}
+  -> (UVError -> UVFileError)
+  -> Async [UVError] a
+  -> Async es a
+toFileError f = handleErrors (throw . f . project1)
+
+--------------------------------------------------------------------------------
+-- File Opening
+--------------------------------------------------------------------------------
+
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
 
@@ -55,11 +82,15 @@ parameters {auto l   : UVLoop}
   fileOutcome : (Outcome es File -> IO ()) -> Ptr Fs -> IO ()
   fileOutcome cb = fsOutcome (cb . map MkFile)
 
+parameters {auto l   : UVLoop}
+           {auto has : Has UVFileError es}
+
   ||| Asynchronously opens a file.
   export
   fsOpen : String -> Flags -> Mode -> Async es File
   fsOpen path f m =
-    uvAsync $ async (uv_fs_open l.loop path f.flags m.mode) . fileOutcome
+    toFileError (OpenError path) $ uvAsync $
+      async (uv_fs_open l.loop path f.flags m.mode) . fileOutcome
 
   export %inline
   readOpen : String -> Async es File
@@ -95,19 +126,6 @@ parameters {auto l   : UVLoop}
   export %inline
   writeBytes : File -> ByteString -> Async es ()
   writeBytes h = writeBytesAt h (-1)
-
-  export %inline
-  writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
-  writeFile p fs m bs =
-    use1 (fsOpen p (WRONLY <+> fs) m) $ \h => writeBytes h bs
-
-  export %inline
-  toFile : (path : String) -> ByteString -> Async es ()
-  toFile p = writeFile p CREAT 0o644
-
-  export %inline
-  appendToFile : (path : String) -> ByteString -> Async es ()
-  appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
 
   ||| Writes all bytes to `stdout`.
   export %inline
@@ -165,6 +183,23 @@ parameters {auto l   : UVLoop}
   printErrLn : Show a => a -> Async es ()
   printErrLn = putErrLn . show
 
+parameters {auto l   : UVLoop}
+           {auto has : Has UVFileError es}
+
+  export %inline
+  writeFile : (path : String) -> Flags -> Mode -> ByteString -> Async es ()
+  writeFile p fs m bs =
+    use1 (fsOpen p (WRONLY <+> fs) m) $ \h =>
+      toFileError (WriteError p) (writeBytes h bs)
+
+  export %inline
+  toFile : (path : String) -> ByteString -> Async es ()
+  toFile p = writeFile p CREAT 0o644
+
+  export %inline
+  appendToFile : (path : String) -> ByteString -> Async es ()
+  appendToFile p = writeFile p (CREAT <+> APPEND) 0o644
+
 --------------------------------------------------------------------------------
 -- File Reading
 --------------------------------------------------------------------------------
@@ -190,9 +225,14 @@ parameters {auto l   : UVLoop}
   readStdIn : Async es ByteString
   readStdIn = readBytes stdin 4096
 
+parameters {auto l   : UVLoop}
+           {auto has : Has UVFileError es}
+
   export
   readFile : (path : String) -> Bits32 -> Async es ByteString
-  readFile path n = use1 (readOpen path) (`readBytes` n)
+  readFile path n =
+    use1 (readOpen path) $ \h =>
+      toFileError (ReadError path) (readBytes h n)
 
   export covering
   streamFileUntil :
@@ -204,7 +244,7 @@ parameters {auto l   : UVLoop}
     where
       go : File -> Async es (Maybe b)
       go h = do
-        v  <- readBytes h size
+        v  <- toFileError (ReadError path) (readBytes h size)
         if null v
            then pure Nothing
            else fun v >>= maybe (go h) (pure . Just)
@@ -228,7 +268,7 @@ parameters {auto l   : UVLoop}
     where
       go : ByteString -> File -> Async es (Maybe b)
       go rem h = do
-        v  <- readBytes h size
+        v  <- toFileError (ReadError path) (readBytes h size)
         if null v
            then fun $ if null rem then [] else [rem]
            else
@@ -257,7 +297,7 @@ parameters {auto l   : UVLoop}
     where
       go : s -> File -> Async es s
       go cur h = do
-        v  <- readBytes h size
+        v  <- toFileError (ReadError path) (readBytes h size)
         if null v then pure cur else go (acc cur v) h
 
   export covering

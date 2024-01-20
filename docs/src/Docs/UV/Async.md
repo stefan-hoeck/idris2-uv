@@ -20,10 +20,10 @@ import System.UV.TCP
 import System.UV.Timer
 
 0 DocIO : Type -> Type
-DocIO = Async [UVError]
+DocIO = Async [UVError, UVFileError]
 
-handles : All (\x => x -> Async [] ()) [UVError]
-handles = [putStrLn . interpolate]
+handles : All (\x => x -> Async [] ()) [UVError, UVFileError]
+handles = [putStrLn . interpolate, putStrLn . interpolate]
 
 runDoc : (UVLoop => DocIO ()) -> IO ()
 runDoc doc = runUV $ handle handles doc
