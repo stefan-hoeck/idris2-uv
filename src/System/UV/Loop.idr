@@ -32,8 +32,7 @@ loopCtxt : UVLoop => ExecutionContext
 loopCtxt @{l} =
   EC
     l.tg
-    (ignore (uv_async_send l.async))
-    (\x => modifyIORef l.ref (:< x))
+    (\x => modifyIORef l.ref (:< x) >> ignore (uv_async_send l.async))
     l.limit
 
 export %inline %hint
@@ -79,7 +78,7 @@ parameters {auto has : Has UVError es}
   export
   uvCancelableAsync :
        (ptr : Async es r)
-    -> (cancel : (Outcome es a -> IO ()) -> r -> Async [] ())
+    -> (cancel : r -> Async [] ())
     -> (free   : r -> Async [] ())
     -> (r -> (a -> IO ()) -> IO Int32)
     -> Async es a
@@ -89,8 +88,8 @@ parameters {auto has : Has UVError es}
       (\p => cancelableAsync $ \cb => do
          n <- reg p (cb . Succeeded)
          case uvRes n of
-           Left err => cb (Error err) $> Nothing
-           Right () => pure () $> Just (cancel cb p)
+           Left err => cb (Error err) $> pure ()
+           Right () => pure (cancel p)
            )
       free
 

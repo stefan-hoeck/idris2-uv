@@ -2,6 +2,7 @@ module System.UV.Pipe
 
 import Data.Buffer.Indexed
 
+import IO.Async.Event
 import System.UV.File
 import System.UV.Loop
 import System.UV.Pointer
@@ -35,9 +36,9 @@ parameters {auto l : UVLoop}
   stdinOpen : Async es (Ptr Pipe)
   stdinOpen = pipeOpen stdin
 
---  export
---  streamStdin :
---       AllocCB
---    -> (ReadRes ByteString -> Async es (Maybe a))
---    -> Async es a
---  streamStdin ac run = use1 stdinOpen $ \h => streamRead ac h run
+  export
+  streamStdin :
+       AllocCB
+    -> (Buffer (ReadRes ByteString) -> Async es a)
+    -> Async es a
+  streamStdin ac run = use1 stdinOpen $ \h => read ac h run

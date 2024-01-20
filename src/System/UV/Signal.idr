@@ -28,6 +28,6 @@ parameters {auto l   : UVLoop}
   onSignal c =
     uvCancelableAsync
       mkSignal
-      (\cb,p => liftIO $ ignore (uv_signal_stop p) >> cb Canceled)
+      (\p => liftIO $ ignore (uv_signal_stop p))
       release
       (\ps,cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c))

@@ -86,28 +86,3 @@ dequeue (MQ m) =
   evalState m $ \x => case dequeue x of
     Nothing    => (x,Nothing)
     Just (v,y) => (y, Just v)
-
---------------------------------------------------------------------------------
--- MBuffer
---------------------------------------------------------------------------------
-
-export
-record MBuffer a where
-  constructor MB
-  var : MVar (SnocList a)
-
-export
-newMBuffer : IO  (MBuffer a)
-newMBuffer = MB <$> newMVar [<]
-
-export
-store : MBuffer a -> a -> IO ()
-store (MB var) v = modifyMVar var (:< v)
-
-export
-extract : MBuffer a -> IO (Maybe $ List a)
-extract (MB var) =
-  evalState var $ \case
-    [<] => ([<], Nothing)
-    sx  => ([<], Just $ sx <>> [])
-

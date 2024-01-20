@@ -3,7 +3,7 @@ module System.UV.Stream
 import Data.Buffer.Indexed
 import Data.ByteString
 
-import IO.Async.MVar
+import IO.Async.Event
 
 import System.UV.Loop
 import System.UV.Pointer
@@ -33,27 +33,28 @@ export
 (cc : CloseCB) => Resource (Ptr Stream) where
   release h = uv_close h cc
 
+export
+shutdownStream : UVLoop => (0 pc : PCast t Stream) => Ptr t -> Async [] ()
+shutdownStream x =
+  let s := castPtr @{pc} x
+   in uv_read_stop s >> ignore (uv_shutdown s $ \_,_ => release s)
+
 parameters {auto l : UVLoop}
            {auto has : Has UVError es}
-
-  close_stream : Ptr Stream -> Async [] ()
-  close_stream x = do
-    uv_read_stop x
-    ignore (uv_shutdown x $ \_,_ => uv_close x %search)
 
   export
   read :
        AllocCB
     -> Ptr t
     -> {auto 0 cstt : PCast t Stream}
-    -> (MBuffer (ReadRes ByteString) -> Async es a)
+    -> (Buffer (ReadRes ByteString) -> Async es a)
     -> Async es a
   read {a} ac h run = finally act (uv_read_stop h)
     where
       act : Async es a
       act = do
-        st <- liftIO newMBuffer
-        uv $ uv_read_start h ac (\_,n,buf => toMsg n buf >>= store st)
+        st <- newEvent
+        uv $ uv_read_start h ac (\_,n,buf => toMsg n buf >>= buffer st)
         run st
 
   export
@@ -62,13 +63,14 @@ parameters {auto l : UVLoop}
     use1 (fromByteString b) $ \cs =>
       uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
 
-  -- export
-  -- listen :
-  --      Ptr t
-  --   -> {auto 0 cst : PCast t Stream}
-  --   -> (MQueue (Either UVError $ Ptr Stream) -> Async es a)
-  --   -> Async es a
-  -- listen {a} {cst} server run = do
-  --   q <- newMQueue
-  --   uv_listen server 128 $ \p,res =>
-  --     enqueue q (uvCheck res p)if res < 0 then Left $ fromCode res else Right p
+  export
+  listen :
+       Ptr t
+    -> {auto 0 cst : PCast t Stream}
+    -> (Buffer (Either UVError $ Ptr Stream) -> Async es a)
+    -> Async es a
+  listen {a} {cst} server run = do
+    q <- newEvent
+    uv $ uv_listen server 128 $ \p,res =>
+      buffer q $ if res < 0 then Left $ fromCode res else Right p
+    run q

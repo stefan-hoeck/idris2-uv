@@ -11,7 +11,7 @@ depends = base >= 0.6.0
         , containers
 
 modules = IO.Async
-        , IO.Async.Async
+        , IO.Async.Event
         , IO.Async.Fiber
         , IO.Async.MVar
         , IO.Async.Outcome

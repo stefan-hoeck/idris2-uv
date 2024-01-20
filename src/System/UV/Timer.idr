@@ -5,7 +5,7 @@
 ||| of module `System.UV.Timer.Raw`.
 module System.UV.Timer
 
-import IO.Async.MVar
+import IO.Async.Event
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Handle
@@ -13,10 +13,13 @@ import System.UV.Raw.Timer
 
 %default total
 
+%inline stopTimer : HasIO io => Ptr Timer -> io ()
+stopTimer = ignore . uv_timer_stop
+
 parameters {auto cc : CloseCB}
   export %inline
   Resource (Ptr Timer) where
-    release h = ignore (uv_timer_stop h) >> uv_close h cc
+    release h = stopTimer h >> uv_close h cc
 
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
@@ -29,21 +32,17 @@ parameters {auto l   : UVLoop}
   export
   repeatedly :
        (timeout,repeat : Bits64)
-    -> (MVar Nat -> Async es a)
+    -> (Event Nat -> Async es a)
     -> Async es a
   repeatedly t r run =
     use1 mkTimer $ \pt => do
-      ec <- executionContext
-      mv <- liftIO $ newMVar Z
-      uv $ uv_timer_start pt (\_ => modifyMVar mv S >> ec.wakeup) t r
-      run mv
+      ev <- newEvent
+      uv $ uv_timer_start pt (\_ => send ev 1 id (+)) t r
+      run ev
 
   ||| Sends a signal after `timeout` milliseconds have passed.
   export
   sleep : (timeout : Bits64) -> Async es ()
   sleep t = do
     uvCancelableAsync
-      mkTimer
-      (\cb,p => liftIO $ ignore (uv_timer_stop p) >> cb Canceled)
-      release
-      (\pt,cb => uv_timer_start pt (\_ => cb ()) t 0)
+      mkTimer stopTimer release (\p,cb => uv_timer_start p (\_ => cb ()) t 0)

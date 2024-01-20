@@ -1,7 +1,7 @@
 module IO.Async.Resource
 
 import Data.List.Quantifiers.Extra
-import IO.Async.Async
+import IO.Async.Fiber
 
 %default total
 
