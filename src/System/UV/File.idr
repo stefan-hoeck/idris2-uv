@@ -61,6 +61,18 @@ parameters {auto l   : UVLoop}
   fsOpen path f m =
     uvAsync $ async (uv_fs_open l.loop path f.flags m.mode) . fileOutcome
 
+  export %inline
+  readOpen : String -> Async es File
+  readOpen s = fsOpen s RDONLY 0
+
+  export %inline
+  writeOpen : String -> Async es File
+  writeOpen s = fsOpen s (WRONLY <+> CREAT) 0o644
+
+  export %inline
+  appendOpen : String -> Async es File
+  appendOpen s = fsOpen s (WRONLY <+> CREAT <+> APPEND) 0o644
+
 --------------------------------------------------------------------------------
 -- File Writing
 --------------------------------------------------------------------------------
@@ -180,7 +192,7 @@ parameters {auto l   : UVLoop}
 
   export
   readFile : (path : String) -> Bits32 -> Async es ByteString
-  readFile path n = use1 (fsOpen path RDONLY 0) (`readBytes` n)
+  readFile path n = use1 (readOpen path) (`readBytes` n)
 
   export covering
   streamFileUntil :
@@ -188,8 +200,7 @@ parameters {auto l   : UVLoop}
     -> Bits32
     -> (ByteString -> Async es (Maybe b))
     -> Async es (Maybe b)
-  streamFileUntil {b} path size fun =
-    use1 (fsOpen path RDONLY 0) $ \h => go h
+  streamFileUntil {b} path size fun = use1 (readOpen path) go
     where
       go : File -> Async es (Maybe b)
       go h = do
@@ -203,6 +214,67 @@ parameters {auto l   : UVLoop}
        (path : String)
     -> Bits32
     -> (ByteString -> Async es ())
-    -> Async es (Maybe ())
+    -> Async es ()
   streamFile path n fun =
-    streamFileUntil path n (\x => fun x $> Nothing)
+    ignore $ streamFileUntil {b = ()} path n (\x => fun x $> Nothing)
+
+  export covering
+  streamLinesUntil :
+       (path : String)
+    -> Bits32
+    -> (List ByteString -> Async es (Maybe b))
+    -> Async es (Maybe b)
+  streamLinesUntil {b} path size fun = use1 (readOpen path) (go empty)
+    where
+      go : ByteString -> File -> Async es (Maybe b)
+      go rem h = do
+        v  <- readBytes h size
+        if null v
+           then fun $ if null rem then [] else [rem]
+           else
+             let (ls,rem2) := accumLines rem v
+              in fun ls >>= maybe (go rem2 h) (pure . Just)
+
+  export covering
+  streamLines :
+       (path : String)
+    -> Bits32
+    -> (List ByteString -> Async es ())
+    -> Async es ()
+  streamLines path size fun =
+    ignore $ streamLinesUntil {b = ()} path size (\xs => fun xs $> Nothing)
+
+  export covering
+  foldBytes :
+       (path : String)
+    -> Bits32
+    -> (s -> ByteString -> s)
+    -> s
+    -> Async es s
+  foldBytes {s} path size acc ini =
+    use1 (readOpen path) (go ini)
+
+    where
+      go : s -> File -> Async es s
+      go cur h = do
+        v  <- readBytes h size
+        if null v then pure cur else go (acc cur v) h
+
+  export covering
+  foldLines :
+       (path : String)
+    -> Bits32
+    -> (s -> ByteString -> s)
+    -> s
+    -> Async es s
+  foldLines {s} path size acc ini =
+    term <$> foldBytes path size accB (empty,ini)
+
+    where
+      term : (ByteString, s) -> s
+      term (bs,s) = if null bs then s else acc s bs
+
+      accB : (ByteString, s) -> ByteString -> (ByteString,s)
+      accB (rem,cur) v =
+        let (ls,rem2) := accumLines rem v
+         in (rem2, foldl acc cur ls)
