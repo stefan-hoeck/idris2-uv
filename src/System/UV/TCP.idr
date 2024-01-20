@@ -1,5 +1,6 @@
 module System.UV.TCP
 
+import IO.Async.Event
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Stream
@@ -63,14 +64,13 @@ parameters {auto l : UVLoop}
   acceptTcp : Ptr Stream -> Async es (Ptr Tcp)
   acceptTcp server = mkTcp >>= uvAct (\x => uv_accept server x)
 
-  export
+  export covering
   listenTcp :
        (addresss : String)
     -> (port     : Bits16)
-    -> (run      : Either UVError (Ptr Stream) -> Async es (Maybe a))
-    -> Async es a
+    -> (run      : Buffer (Either UVError (Ptr Stream)) -> Async es ())
+    -> Async es ()
   listenTcp address port run =
     use1 (mallocPtr SockAddrIn) $ \addr => do
       uv (uv_ip4_addr address port addr)
-      server <- bindTcp addr
-      listen server run
+      use1 (bindTcp addr) $ \server => listen server run

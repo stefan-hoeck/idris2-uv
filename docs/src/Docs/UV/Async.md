@@ -9,9 +9,8 @@ We start with some imports and type aliases:
 ```idris
 module Docs.UV.Async
 
-import Data.IORef
+import IO.Async.Event
 import System
-import System.File
 import System.UV
 import System.UV.Idle
 import System.UV.Signal
@@ -27,7 +26,7 @@ handles : All (\x => x -> Async [] ()) [UVError]
 handles = [putStrLn . interpolate]
 
 runDoc : (UVLoop => DocIO ()) -> IO ()
-runDoc doc = runUV $ runAsync (handle handles doc)
+runDoc doc = runUV $ handle handles doc
 ```
 
 So, `DocIO a` is an alias for `Async [UVError] a`, which is a computation
@@ -51,32 +50,23 @@ Here's the code:
 
 ```idris
 parameters {auto l : UVLoop}
+  timerExample : DocIO ()
+  timerExample = onIdle (go 50)
 
-  checkCounter : IORef Integer -> DocIO (Maybe ())
-  checkCounter ref = do
-    modifyIORef ref (+1)
-    v <- readIORef ref
-    when (v `mod` 10000 == 0) (putOutLn "Counter is at \{show v}")
-    pure Nothing
-
-  idleExample : DocIO ()
-  idleExample = do
-    putStrLn "Hello World"
-    ref     <- newIORef 0
-    putStrLn "Starting the counter"
-    counter <- start $ onIdle (checkCounter ref)
-
-    res     <- raceAny [onSignal SIGINT, once 5000]
-
-    case res of
-      Here sig => putOutLn "Counter interrupted by \{show sig}"
-      _        => putOutLn "Counter interrupted by timeout"
-
-    putOutLn "Cancelling counter"
-    cancel
+    where
+      go : Nat -> Event Nat -> DocIO ()
+      go 0     m = pure ()
+      go (S k) m = do
+        n <- onEvent m
+        putOutLn "At \{show $ S k}: Got \{show n} ticks"
+        sleep 100
+        go k m
 
 -- main : IO ()
--- main = runDoc idleExample
+-- main = runDoc $ do
+--   putStrLn "Going to sleep"
+--   race [timerExample, ignore $ onSignal SIGINT]
+--   putOutLn "Good morning"
 ```
 
 First, we note that `Async` comes with an implementation of `MonadIO`,
@@ -120,8 +110,8 @@ parameters {auto l : UVLoop}
     v <- use1 (fsOpen "out" (WRONLY <+> CREAT) 0o644) $ \f =>
            raceAny
              [ onSignal SIGINT
-             , once 10000
-             , streamFile p 0xffff $ writeBytes f
+             , sleep 10000
+             , streamFile p 0xfffff $ writeBytes f
              ]
 
     case v of
@@ -142,26 +132,39 @@ connections before shutting down (which happens, when
 
 ```idris
 parameters {auto l : UVLoop}
-  onConnection : AllocCB -> Ptr Stream -> DocIO (Maybe ())
+  onConnection : AllocCB -> Ptr Stream -> DocIO ()
   onConnection ac server = do
     putOutLn "Got a connection"
-    client <- acceptTcp server
-    _      <- start $ streamReadWrite ac client $ \case
-      Done     => pure (Just ())
-      Data val => write client val $> Nothing
-      Err x    => throw x
-    pure Nothing
+    bracket (acceptTcp server) echo shutdownStream
+
+    where
+      echoWrite : Ptr Tcp -> Buffer (ReadRes ByteString) -> DocIO ()
+      echoWrite p buf = onEvent buf >>= echoWrite' . (<>> [])
+
+        where
+          echoWrite' : List (ReadRes ByteString) -> DocIO ()
+          echoWrite' []            = echoWrite p buf
+          echoWrite' (Done :: _)   = putOutLn "Done reading. Closing stream."
+          echoWrite' (Data v :: t) = write p v >> echoWrite' t
+          echoWrite' (Err x :: _)  =
+            putErrLn "Error when reading from stream: \{show x}"
+
+      echo : Ptr Tcp -> DocIO ()
+      echo p = read ac p (echoWrite p)
+
+  serve : AllocCB -> Buffer (Either UVError $ Ptr Stream) -> DocIO ()
+  serve ac ev = (onEvent ev >>= traverse_ handleEv . (<>> [])) >> serve ac ev
+
+    where
+      handleEv : Either UVError (Ptr Stream) -> DocIO ()
+      handleEv (Left x)  = putErrLn "Error while serving: \{x}"
+      handleEv (Right x) = background $ onConnection ac x
 
   echo : DocIO ()
   echo = do
     ac <- sizedAlloc 0xffff
-    server <- start $ listenTcp "0.0.0.0" 7000 $ \case
-      Left err  => putErrLn "Error when receiving request: \{err}" $> Nothing
-      Right srv => onConnection ac srv
-
-    ignore $ onSignal SIGINT
+    race [listenTcp "0.0.0.0" 7000 (serve ac), ignore $ onSignal SIGINT]
     putOutLn "Shutting down server..."
-    cancel
 
 main : IO ()
 main = runDoc echo

@@ -12,9 +12,6 @@ parameters {auto cc : CloseCB}
   Resource (Ptr Signal) where
     release h = uv_close h cc
 
-  signal_stop : Ptr Signal -> Async [] ()
-  signal_stop pt =ignore (uv_signal_stop pt) >> release pt
-
 parameters {auto l   : UVLoop}
            {auto has : Has UVError es}
   export
@@ -28,7 +25,9 @@ parameters {auto l   : UVLoop}
   |||       Wrap this in `start` to run it in the background.
   export
   onSignal : SigCode -> Async es SigCode
-  onSignal c = do
-    ps <- mkSignal
-    uvOnce ps signal_stop $
-      \cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c)
+  onSignal c =
+    uvCancelableAsync
+      mkSignal
+      (\p => liftIO $ ignore (uv_signal_stop p))
+      release
+      (\ps,cb => uv_signal_start ps (\_,_ => cb c) (sigToCode c))

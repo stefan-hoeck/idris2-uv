@@ -26,6 +26,7 @@ record MVar a where
   ref  : IORef a
   lock : Mutex
 
+||| Create a new mutable variable.
 export
 newMVar : a -> IO (MVar a)
 newMVar v = [| MV (newIORef v) makeMutex |]
@@ -37,18 +38,23 @@ withLock mv f = do
   mutexRelease mv.lock
   pure vb
 
+||| Atomically read the value from a mutable variable.
 export %inline
 readMVar : MVar a -> IO a
 readMVar mv = withLock mv readIORef
 
+||| Atomically write a value into a mutable variable.
 export %inline
 writeMVar : MVar a -> a -> IO ()
 writeMVar mv v = withLock mv (`writeIORef` v)
 
+||| Atomically modify the value in a mutable variable.
 export %inline
 modifyMVar : MVar a -> (a -> a) -> IO ()
 modifyMVar mv f = withLock mv (`modifyIORef` f)
 
+||| Atomically modify and extract the value from a
+||| mutable variable.
 export
 evalState : MVar a -> (a -> (a,b)) -> IO b
 evalState mv f =
@@ -57,64 +63,26 @@ evalState mv f =
     writeIORef ref st
     pure res
 
-export
-evalIO : MVar a -> (a -> (a,IO b)) -> IO b
-evalIO mv f =
-  withLock mv $ \ref => do
-    (st,res) <- f <$> readIORef ref
-    writeIORef ref st
-    res
-
 --------------------------------------------------------------------------------
--- Deferred
+-- MQueue
 --------------------------------------------------------------------------------
 
-||| A deferred value is initially empty and can be set exactly once.
 export
-record Deferred a where
-  constructor D
-  var  : MVar (Maybe a)
-  cond : Condition
+record MQueue a where
+  constructor MQ
+  var : MVar (Queue a)
 
 export
-fromMVar : MVar (Maybe a) -> IO (Deferred a)
-fromMVar mv = D mv <$> makeCondition
+newMQueue : IO (MQueue a)
+newMQueue = MQ <$> newMVar empty
 
 export
-newDeferred : IO (Deferred a)
-newDeferred = [| D (newMVar Nothing) makeCondition |]
-
-covering
-get' : (acq : Bool) -> Deferred a -> IO a
-get' b d = do
-  when b (mutexAcquire d.var.lock)
-  v <- readIORef d.var.ref
-  case v of
-    Just x  => mutexRelease d.var.lock $> x
-    Nothing => conditionWait d.cond d.var.lock >> get' False d
-
-||| Blocks the current thread while waiting on the deferred
-||| value to be filled with a result.
-export covering %inline
-get : Deferred a -> IO a
-get = get' True
-
-export %inline
-clearGet : Deferred a -> IO (Maybe a)
-clearGet d = do
-  Just v <- readMVar d.var | Nothing => pure Nothing
-  writeMVar d.var Nothing
-  pure $ Just v
-
-export %inline
-tryGet : Deferred a -> IO (Maybe a)
-tryGet = readMVar . var
+enqueue : MQueue a -> a -> IO ()
+enqueue (MQ m) v = modifyMVar m (`enqueue` v)
 
 export
-complete : Deferred a -> a -> IO Bool
-complete d v = do
-  b <- evalState d.var $ \case
-         Just x  => (Just x, False)
-         Nothing => (Just v, True)
-  conditionBroadcast d.cond
-  pure b
+dequeue : MQueue a -> IO (Maybe a)
+dequeue (MQ m) =
+  evalState m $ \x => case dequeue x of
+    Nothing    => (x,Nothing)
+    Just (v,y) => (y, Just v)

@@ -3,6 +3,8 @@ module System.UV.Stream
 import Data.Buffer.Indexed
 import Data.ByteString
 
+import IO.Async.Event
+
 import System.UV.Loop
 import System.UV.Pointer
 import System.UV.Raw.Handle
@@ -31,42 +33,32 @@ export
 (cc : CloseCB) => Resource (Ptr Stream) where
   release h = uv_close h cc
 
+export
+shutdownStream : UVLoop => (0 pc : PCast t Stream) => Ptr t -> Async [] ()
+shutdownStream x =
+  let s := castPtr @{pc} x
+   in uv_read_stop s >> ignore (uv_shutdown s $ \_,_ => release s)
+
 parameters {auto l : UVLoop}
            {auto has : Has UVError es}
 
-  close_stream : Ptr Stream -> Async [] ()
-  close_stream x = do
-    uv_read_stop x
-    ignore (uv_shutdown x $ \_,_ => uv_close x %search)
-
   export
-  streamRead :
+  read :
        AllocCB
     -> Ptr t
     -> {auto 0 cstt : PCast t Stream}
-    -> (ReadRes ByteString -> Async es (Maybe a))
+    -> (Buffer (ReadRes ByteString) -> Async es a)
     -> Async es a
-  streamRead ac h run = do
-    uvForever run h (\x => uv_read_stop x) $ \cb =>
-      uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
+  read {a} ac h run = finally act (uv_read_stop h)
+    where
+      act : Async es a
+      act = do
+        st <- newEvent
+        uv $ uv_read_start h ac (\_,n,buf => toMsg n buf >>= buffer st)
+        run st
 
   export
-  streamReadWrite :
-       AllocCB
-    -> Ptr t
-    -> {auto 0 cstt : PCast t Stream}
-    -> (ReadRes ByteString -> Async es (Maybe a))
-    -> Async es a
-  streamReadWrite ac h run = do
-    uvForever run h (close_stream . castPtr) $ \cb =>
-      uv_read_start h ac (\_,n,buf => toMsg n buf >>= cb)
-
-  export
-  write :
-       Ptr t
-    -> {auto 0 cstt : PCast t Stream}
-    -> ByteString
-    -> Async es ()
+  write : Ptr t -> (0 _ : PCast t Stream) => ByteString -> Async es ()
   write str b =
     use1 (fromByteString b) $ \cs =>
       uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
@@ -75,9 +67,10 @@ parameters {auto l : UVLoop}
   listen :
        Ptr t
     -> {auto 0 cst : PCast t Stream}
-    -> (Either UVError (Ptr Stream) -> Async es (Maybe a))
+    -> (Buffer (Either UVError $ Ptr Stream) -> Async es a)
     -> Async es a
-  listen {cst} server run =
-    uvForever run server (release . castPtr @{cst}) $ \cb =>
-      uv_listen server 128 $ \p,res =>
-        cb $ if res < 0 then Left $ fromCode res else Right p
+  listen {a} {cst} server run = do
+    q <- newEvent
+    uv $ uv_listen server 128 $ \p,res =>
+      buffer q $ if res < 0 then Left $ fromCode res else Right p
+    run q
