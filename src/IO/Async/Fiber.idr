@@ -228,6 +228,19 @@ export %inline
 throw : Has e es => e -> Async es a
 throw = fail . inject
 
+||| Inject an `Either e a` computation into an `Async` monad dealing
+||| with several possible errors.
+export
+injectEither : Has e es => Either e a -> Async es a
+injectEither (Left v)  = throw v
+injectEither (Right v) = pure v
+
+||| Inject an `IO (Either e a)` computation into an `Async` monad dealing
+||| with several possible errors.
+export
+injectIO : Has e es => IO (Either e a) -> Async es a
+injectIO = sync . map (mapFst inject)
+
 export %inline
 handleErrors : (HSum es -> Async fs a) -> Async es a -> Async fs a
 handleErrors f x =
