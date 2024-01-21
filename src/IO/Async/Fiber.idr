@@ -253,8 +253,12 @@ export %inline
 dropErrs : Async es () -> Async [] ()
 dropErrs = handleErrors (const $ pure ())
 
+public export
+0 Handler : Type -> Type -> Type
+Handler a x = x -> Async [] a
+
 export %inline
-handle : All (\x => x -> Async [] a) es -> Async es a -> Async [] a
+handle : All (Handler a) es -> Async es a -> Async [] a
 handle hs = handleErrors (collapse' . hzipWith id hs)
 
 export
