@@ -52,6 +52,10 @@ record CloseCB where
   constructor CC
   ptr : AnyPtr
 
+export %inline
+freeCloseCB : HasIO io => CloseCB -> io ()
+freeCloseCB (CC p) = unlockAnyPtr p
+
 parameters {auto has   : HasIO io}
            {auto 0 prf : PCast t Handle}
 
@@ -115,6 +119,10 @@ parameters {auto has   : HasIO io}
     unlockAnyPtr d
     freePtr p
 
+  export %inline
+  freeHandleWithoutUnlocking : Ptr t -> io ()
+  freeHandleWithoutUnlocking = freePtr
+
 ||| Allocates and locks a callback for closing handles.
 |||
 ||| The callback will run any custom operations given in the
@@ -126,3 +134,7 @@ closeCB f = map CC $ ptrCB (\x => f x >> freeHandle x)
 export
 defaultClose : HasIO io => io CloseCB
 defaultClose = closeCB $ \_ => pure ()
+
+export %inline
+closeWithoutUnlockingCB : HasIO io => io (CloseCB)
+closeWithoutUnlockingCB = map CC $ ptrCB (\x => freeHandleWithoutUnlocking {t = Handle} x)
