@@ -241,13 +241,21 @@ export
 injectIO : Has e es => IO (Either e a) -> Async es a
 injectIO = sync . map (mapFst inject)
 
-export %inline
+export
 handleErrors : (HSum es -> Async fs a) -> Async es a -> Async fs a
 handleErrors f x =
   Bind U x $ \case
     Succeeded x => Term $ Succeeded x
     Error x     => f x
     Canceled    => Term Canceled
+
+export %inline
+mapErrors : (HSum es -> HSum fs) -> Async es a -> Async fs a
+mapErrors f = handleErrors (fail . f)
+
+export %inline
+weakenErrors : Async [] a -> Async fs a
+weakenErrors = mapErrors $ \case x impossible
 
 export %inline
 dropErrs : Async es () -> Async [] ()
