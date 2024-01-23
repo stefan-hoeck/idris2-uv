@@ -71,6 +71,6 @@ parameters {auto l : UVLoop}
     -> (run      : Buffer (Either UVError (Ptr Stream)) -> Async es ())
     -> Async es ()
   listenTcp address port run =
-    use1 (mallocPtr SockAddrIn) $ \addr => do
+    useMany [mallocPtr SockAddrIn, closeWithoutUnlockingCB] $ \[addr,cc] => do
       uv (uv_ip4_addr address port addr)
-      use1 (bindTcp addr) $ \server => listen server run
+      bracket (bindTcp addr) (\server => listen server run) (\p => uv_close p cc)

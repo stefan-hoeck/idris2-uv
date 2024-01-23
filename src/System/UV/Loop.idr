@@ -102,6 +102,10 @@ parameters {auto has : Has UVError es}
         Left err => cb (Error err)
         Right () => pure ()
 
+export %inline
+Resource CloseCB where
+  release = freeCloseCB
+
 ||| Sets up the given application by registering it at the default loop
 ||| and starting the loop afterwards.
 covering export
