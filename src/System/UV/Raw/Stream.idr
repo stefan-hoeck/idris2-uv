@@ -95,7 +95,7 @@ parameters {auto has : HasIO io}
     ->  io Int32
   uv_shutdown str act = do
     p  <- mallocPtr Shutdown
-    cb <- ptrIntCB (\p,y => putStrLn "uv shutdown" >> act p y >> freeReq p)
+    cb <- ptrIntCB (\p,y => act p y >> freeReq p)
     uv_req_set_data p cb
     primIO $ prim__uv_shutdown p (castPtr str) cb
 
@@ -162,7 +162,7 @@ parameters {auto has : HasIO io}
     ->  io Int32
   uv_write str buf size act = do
     wr <- mallocPtr Write
-    cb <- ptrIntCB (\x,y => putStrLn "free write" >> act x y >> freeReq x)
+    cb <- ptrIntCB (\x,y => act x y >> freeReq x)
     uv_req_set_data wr cb
     primIO $ prim__uv_write wr (castPtr str) buf size cb
 
