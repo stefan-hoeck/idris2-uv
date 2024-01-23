@@ -261,6 +261,14 @@ export %inline
 handle : All (Handler a) es -> Async es a -> Async [] a
 handle hs = handleErrors (collapse' . hzipWith id hs)
 
+export %inline
+liftErrors : Async es a -> Async fs (Result es a)
+liftErrors = handleErrors (pure . Left) . map Right
+
+export %inline
+liftError : Async [e] a -> Async fs (Either e a)
+liftError = handleErrors (pure . Left . project1) . map Right
+
 export
 guaranteeCase : Async es a -> (Outcome es a -> Async [] ()) -> Async es a
 guaranteeCase as f =
