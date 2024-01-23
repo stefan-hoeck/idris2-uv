@@ -122,7 +122,7 @@ parameters {auto has   : HasIO io}
 ||| `handler` argument before freeing the `Ptr Handle` from memory.
 export %inline
 closeCB : HasIO io => (handler : Ptr Handle -> IO ()) -> io (CloseCB)
-closeCB f = map CC $ ptrCB (\x => f x >> freeHandle x)
+closeCB f = map CC $ ptrCB (\x => putStrLn "invoked close cb" >> f x >> freeHandle x)
 
 export
 defaultClose : HasIO io => io CloseCB
