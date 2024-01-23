@@ -73,4 +73,4 @@ parameters {auto l : UVLoop}
   listenTcp address port run =
     use1 (mallocPtr SockAddrIn) $ \addr => do
       uv (uv_ip4_addr address port addr)
-      use1 (bindTcp addr) $ \server => listen server run
+      bindTcp addr >>= \server => listen server run
