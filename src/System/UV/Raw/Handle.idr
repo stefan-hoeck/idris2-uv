@@ -112,6 +112,7 @@ parameters {auto has   : HasIO io}
   freeHandle : Ptr t -> io ()
   freeHandle p = do
     d <- uv_handle_get_data p
+    putStrLn "freeing handle"
     unlockAnyPtr d
     freePtr p
 

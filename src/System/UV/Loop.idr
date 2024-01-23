@@ -108,7 +108,7 @@ covering export
 runUV : (UVLoop => Async [] ()) -> IO ()
 runUV act = do
   loop <- defaultLoop
-  runAsync $ finally (act @{loop}) (liftIO $ uv_close loop.async loop.cc)
+  runAsync $ finally (act @{loop}) (liftIO $ putStrLn "closing async" >> uv_close loop.async loop.cc)
   res <- uv_run loop.loop (toCode Default)
   case uvRes {es = [UVError]} res of
     Left (Here err) => die "\{err}"
