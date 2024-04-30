@@ -60,8 +60,8 @@ parameters {auto l : UVLoop}
   export
   write : Ptr t -> (0 _ : PCast t Stream) => ByteString -> Async es ()
   write str b =
-    use1 (fromByteString b) $ \cs =>
-      uv $ uv_write str cs (cast b.size) (\_,_ => pure ())
+    use1 (fromByteString b) $ \cs => uvAsync $ \cb =>
+      uv_write str cs (cast b.size) (\_,_ => cb $ Succeeded ())
 
   export
   listen :
