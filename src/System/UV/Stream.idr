@@ -22,6 +22,12 @@ data ReadRes : (a : Type) -> Type where
   Data : (val : a) -> ReadRes a
   Err  : UVError -> ReadRes a
 
+export
+Functor ReadRes where
+  map _ Done       = Done
+  map f (Data val) = Data (f val)
+  map _ (Err err)  = Err err
+
 toMsg : Int32 -> Ptr Buf -> IO (ReadRes ByteString)
 toMsg n buf =
   case uvRes {es = [UVError]} n $> n of
