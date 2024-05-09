@@ -28,6 +28,22 @@ Functor ReadRes where
   map f (Data val) = Data (f val)
   map _ (Err err)  = Err err
 
+export
+Applicative ReadRes where
+  pure = Data
+
+  (Data f)  <*> (Data a)  = pure (f a)
+  Done      <*> _         = Done
+  (Err err) <*> _         = Err err
+  _         <*> Done      = Done
+  _         <*> (Err err) = Err err
+
+export
+Monad ReadRes where
+  Done      >>= _ = Done
+  (Data a)  >>= f = f a
+  (Err err) >>= _ = Err err
+
 toMsg : Int32 -> Ptr Buf -> IO (ReadRes ByteString)
 toMsg n buf =
   case uvRes {es = [UVError]} n $> n of
