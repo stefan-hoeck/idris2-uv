@@ -1,5 +1,6 @@
 module System.UV.Stream
 
+import Control.Monad.Trans
 import Data.Buffer.Indexed
 import Data.ByteString
 
@@ -32,17 +33,49 @@ export
 Applicative ReadRes where
   pure = Data
 
-  (Data f)  <*> (Data a)  = pure (f a)
-  Done      <*> _         = Done
-  (Err err) <*> _         = Err err
-  _         <*> Done      = Done
-  _         <*> (Err err) = Err err
+  Data f  <*> Data a  = pure (f a)
+  Done    <*> _       = Done
+  Err err <*> _       = Err err
+  _       <*> Done    = Done
+  _       <*> Err err = Err err
 
 export
 Monad ReadRes where
-  Done      >>= _ = Done
-  (Data a)  >>= f = f a
-  (Err err) >>= _ = Err err
+  Done    >>= _ = Done
+  Data a  >>= f = f a
+  Err err >>= _ = Err err
+
+public export
+data ReadResT : (m : Type -> Type) -> (a : Type) -> Type where
+  MkReadResT : m (ReadRes a) -> ReadResT m a
+
+export %inline
+runReadResT : ReadResT m a -> m (ReadRes a)
+runReadResT (MkReadResT x) = x
+
+export
+Functor m => Functor (ReadResT m) where
+  map f (MkReadResT x) = MkReadResT $ map f <$> x
+
+export
+Applicative m => Applicative (ReadResT m) where
+  pure = MkReadResT . pure . pure
+  MkReadResT f <*> MkReadResT x = MkReadResT [| f <*> x |]
+
+export
+Monad m => Monad (ReadResT m) where
+  MkReadResT x >>= f = MkReadResT $ do
+    Data x' <- x | Err err => pure (Err err)
+                 | Done => pure Done
+    runReadResT $ f x'
+
+export
+MonadTrans ReadResT where
+  lift = MkReadResT . map pure
+
+export
+HasIO m => HasIO (ReadResT m) where
+  liftIO act = MkReadResT $ liftIO act >>= pure . pure
 
 toMsg : Int32 -> Ptr Buf -> IO (ReadRes ByteString)
 toMsg n buf =
